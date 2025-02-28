@@ -1,0 +1,43 @@
+.dark .react-quill-dark .ql-toolbar {
+    background-color: #2d3748;
+    border-color: #4a5568;
+  }
+  
+  .dark .react-quill-dark .ql-container {
+    background-color: #2d3748;
+    border-color: #4a5568;
+  }
+  
+  .dark .react-quill-dark .ql-editor {
+    color: #e2e8f0;
+  }
+  
+  .dark .react-quill-dark .ql-picker {
+    color: #e2e8f0;
+  }
+  
+  .dark .react-quill-dark .ql-stroke {
+    stroke: #e2e8f0;
+  }
+  
+  .dark .react-quill-dark .ql-fill {
+    fill: #e2e8f0;
+  }
+  
+  .dark .react-quill-dark .ql-picker-options {
+    background-color: #2d3748;
+    border-color: #4a5568;
+  }
+  
+  .dark .react-quill-dark .ql-tooltip {
+    background-color: #2d3748;
+    color: #e2e8f0;
+    border-color: #4a5568;
+  }
+  
+  .dark .react-quill-dark .ql-tooltip input[type="text"] {
+    background-color: #4a5568;
+    color: #e2e8f0;
+  }
+  
+  

@@ -17,7 +17,7 @@ export const ProcessingOverlay = ({ isProcessing, isPolling, statusMessages }: P
         <div className="space-y-4">
           {/* Static message about processing time */}
           <p className="text-sm dark:text-gray-300">
-            This task may take 3 to 4 minutes to complete. Please wait...
+            This task may take 10 to 15 minutes to complete. Please wait...
           </p>
 
           {/* Dynamic status message */}

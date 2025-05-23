@@ -97,7 +97,7 @@ export default function AddCoursePage() {
   if (!isClient) return null // Prevents rendering on the server
 
   return (
-    <div className="container mx-auto p-6 dark:bg-gray-900 min-h-screen">
+    <div className="container mx-auto p-6 dark:bg-gray-900 min-h-screen min-w-full">
       <Card className="max-w-2xl mx-auto dark:bg-gray-800 shadow-lg">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold dark:text-white">Add New Course</CardTitle>

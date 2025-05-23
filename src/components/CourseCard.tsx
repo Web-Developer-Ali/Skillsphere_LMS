@@ -44,7 +44,7 @@ export default function CourseCard({ course, variant = "default" }: CourseCardPr
   }, [course.ThumbnailPublicID])
 
   const handleAddContent = () => {
-    router.push(`/instructor/courses_details_page?id=${course.CourseID}`)
+    router.push(`/instructor/courses_details_page/${course.CourseID}`)
   }
 
   // Strip HTML tags from the description
@@ -86,9 +86,9 @@ export default function CourseCard({ course, variant = "default" }: CourseCardPr
         <div className={`flex justify-between items-center ${isCompact ? "mb-0" : "mb-2"}`}>
           <div className="flex items-center">
             <span className="text-yellow-500 mr-1">★</span>
-            <span className="dark:text-gray-300">{course.Rating.toFixed(1)}</span>
+            <span className="dark:text-gray-300">{course.Rating}</span>
           </div>
-          <span className="text-lg font-bold dark:text-white">${course.Fees.toFixed(2)}</span>
+          <span className="text-lg font-bold dark:text-white">${course.Fees}</span>
         </div>
         {!isCompact && (
           <div className="flex justify-between items-center mt-2">

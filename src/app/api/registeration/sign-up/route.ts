@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { sendEmail } from "@/helper/sendVerificationEmail";
 
 export async function POST(request: Request): Promise<Response> {
-  const dbConnection = await connectToDatabase();
+  const pool = await connectToDatabase();
   const { full_Name, email, password } = await request.json();
   const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
   const expireTime = new Date();
@@ -11,12 +11,12 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     // Check if the user already exists with the provided email
-    const existingUserResult = await dbConnection
-      .request()
-      .input("email", email)
-      .query(`SELECT Email FROM Users WHERE Email = @email`);
+    const existingUserResult = await pool.query(
+      `SELECT "Email" FROM "Users" WHERE "Email" = $1`,
+      [email]
+    );
 
-    if (existingUserResult.recordset.length > 0) {
+    if (existingUserResult.rows.length > 0) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -30,22 +30,34 @@ export async function POST(request: Request): Promise<Response> {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert new user into the database and get the new UserID
-    const insertResult = await dbConnection
-      .request()
-      .input("fullName", full_Name)
-      .input("email", email)
-      .input("password", Buffer.from(hashedPassword))
-      .input("verifyCode", verifyCode)
-      .input("expireVerifyCode", expireTime)
-      .input("isVerified", false)
-      .input("UserType", "Student")
-      .query(`
-        INSERT INTO Users (FullName, Email, Password, VerifyCode, ExpireVerifyCode, IsVerified, UserType, CreatedAt, UpdatedAt)
-        OUTPUT INSERTED.UserID
-        VALUES (@fullName, @email, @password, @verifyCode, @expireVerifyCode, @isVerified, @UserType, GETDATE(), GETDATE())
-      `);
+    const insertResult = await pool.query(
+      `
+        INSERT INTO "Users" (
+          "FullName", 
+          "Email", 
+          "Password", 
+          "VerifyCode", 
+          "ExpireVerifyCode", 
+          "IsVerified", 
+          "UserType", 
+          "CreatedAt", 
+          "UpdatedAt"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+        RETURNING "UserID"
+      `,
+      [
+        full_Name,
+        email,
+        Buffer.from(hashedPassword),
+        verifyCode,
+        expireTime,
+        false,
+        "Student"
+      ]
+    );
 
-    const newUserId = insertResult.recordset[0].UserID;
+    const newUserId = insertResult.rows[0].UserID;
 
     // Send OTP email to the user
     await sendEmail({

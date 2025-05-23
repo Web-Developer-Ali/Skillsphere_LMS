@@ -112,7 +112,7 @@ export default function InstructorDashboard({ initialData }: InstructorDashboard
   }
 
   return (
-    <div className="container mx-auto p-6 dark:bg-gray-900 min-h-screen">
+    <div className="container mx-auto p-6 dark:bg-gray-900 min-h-screen min-w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold dark:text-white">Instructor Dashboard</h1>
         <Button
@@ -125,16 +125,16 @@ export default function InstructorDashboard({ initialData }: InstructorDashboard
 
       <Tabs defaultValue="overview" className="dark:text-gray-200">
         <TabsList className="dark:bg-gray-800 mb-4">
-          <TabsTrigger value="overview" className="dark:data-[state=active]:bg-gray-700">
+          <TabsTrigger value="overview" className="dark:text-white dark:data-[state=active]:text-white dark:data-[state=active]:bg-gray-700">
             Overview
           </TabsTrigger>
-          <TabsTrigger value="courses" className="dark:data-[state=active]:bg-gray-700">
+          <TabsTrigger value="courses" className="dark:text-white dark:data-[state=active]:text-white dark:data-[state=active]:bg-gray-700">
             Courses
           </TabsTrigger>
-          <TabsTrigger value="students" className="dark:data-[state=active]:bg-gray-700">
+          <TabsTrigger value="students" className="dark:text-white dark:data-[state=active]:text-white dark:data-[state=active]:bg-gray-700">
             Students
           </TabsTrigger>
-          <TabsTrigger value="revenue" className="dark:data-[state=active]:bg-gray-700">
+          <TabsTrigger value="revenue" className="dark:text-white dark:data-[state=active]:text-white dark:data-[state=active]:bg-gray-700">
             Revenue
           </TabsTrigger>
         </TabsList>

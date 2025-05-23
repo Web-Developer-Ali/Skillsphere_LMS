@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"; 
 import { z } from "zod";
 import dbConnection from "@/lib/dbConnect";
-import sql from "mssql";
 
 const studentSchema = z.object({
   age: z.number().min(13, "You must be at least 13 years old").max(120, "Please enter a valid age"),
@@ -21,8 +20,6 @@ const commonSchema = z.object({
 const studentFormSchema = commonSchema.merge(studentSchema);
 const instructorFormSchema = commonSchema.merge(instructorSchema);
 
-type SQLParam = { name: string; type: sql.ISqlType; value: string | number | boolean | null };
-
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
@@ -41,44 +38,44 @@ export async function PUT(req: Request) {
     const pool = await dbConnection();
 
     // Start constructing the SQL update query
-    let updateFields = "";
-    const params: SQLParam[] = [
-      { name: "UserID", type: sql.Int(), value: parseInt(id, 10) },
-      { name: "OnboardComplete", type: sql.Bit(), value: true },
-    ];
+    let updateFields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    // Common parameters
+    values.push(parseInt(id, 10)); // $1 - UserID
+    values.push(true); // $2 - OnboardComplete
 
     if (userType === "Student") {
-      updateFields += "Age = @Age, DesireRole = @DesireRole, ";
-      params.push(
-        { name: "Age", type: sql.Int(), value: data.age },
-        { name: "DesireRole", type: sql.NVarChar(255), value: data.desire_role }
-      );
+      updateFields.push(`"Age" = $${paramIndex + 2}`);
+      updateFields.push(`"DesireRole" = $${paramIndex + 3}`);
+      values.push(data.age); // $3 - Age
+      values.push(data.desire_role); // $4 - DesireRole
     } else if (userType === "Instructor") {
-      updateFields += "Bio = @Bio, Expertise = @Expertise, UserType = @UserType, ";
-      params.push(
-        { name: "Bio", type: sql.NVarChar(sql.MAX), value: data.bio },
-        { name: "Expertise", type: sql.NVarChar(255), value: data.expertise },
-        { name: "UserType", type: sql.NVarChar(255), value: "Instructor" }
-      );
+      updateFields.push(`"Bio" = $${paramIndex + 2}`);
+      updateFields.push(`"Expertise" = $${paramIndex + 3}`);
+      updateFields.push(`"UserType" = $${paramIndex + 4}`);
+      values.push(data.bio); // $3 - Bio
+      values.push(data.expertise); // $4 - Expertise
+      values.push("Instructor"); // $5 - UserType
     }
+
+    // Add common fields
+    updateFields.push(`"OnboardComplete" = $2`);
+    updateFields.push(`"UpdatedAt" = NOW()`);
 
     // Finalize the update query
     const query = `
-      UPDATE Users 
-      SET ${updateFields} OnboardComplete = @OnboardComplete, UpdatedAt = GETDATE()
-      WHERE UserID = @UserID;
+      UPDATE "Users" 
+      SET ${updateFields.join(", ")}
+      WHERE "UserID" = $1
     `;
 
     // Execute the query
-    const request = pool.request();
-    params.forEach((param) =>
-      request.input(param.name, param.type, param.value)
-    );
-
-    const result = await request.query(query);
+    const result = await pool.query(query, values);
 
     // Check if the update was successful
-    if (result.rowsAffected[0] > 0) {
+    if (result.rowCount != 0) {
       return NextResponse.json(
         { success: true, message: "Profile updated successfully!" },
         { status: 200 }

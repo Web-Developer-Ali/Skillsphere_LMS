@@ -12,11 +12,12 @@ interface AuthToken {
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl.clone();
 
-  // Get the NextAuth.js token
-  const token = (await getToken({ req, secret: process.env.NEXTAUTH_SECRET })) as AuthToken | null;
-  console.log(token);
+  const token = (await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  })) as AuthToken | null;
 
-  // Allow access to the onboarding page without further redirection
+  // Allow access to onboarding without checks
   if (url.pathname === "/onboarding") {
     return NextResponse.next();
   }
@@ -24,37 +25,52 @@ export async function middleware(req: NextRequest) {
   if (token) {
     const { isNewUser, onboardComplete, _id: userId, role } = token;
 
-    // Redirect to onboarding if the user is new and hasn't completed onboarding
+    // Redirect if user is new and not onboarded
     if (isNewUser && onboardComplete === false) {
       url.pathname = `/onboarding`;
-
-      // Add the user's _id to the query parameters if it exists
       if (typeof userId === "string") {
         url.searchParams.set("userId", userId);
       }
-
       return NextResponse.redirect(url);
     }
 
-    console.log(
-      url.pathname === "/sign-in" ||
-      url.pathname === "/sign-up" ||
-      url.pathname.startsWith("/verify/") ||
-      url.pathname === "/onboarding"
-    );
+    // Redirect if onboard incomplete but trying to access restricted routes
+    if (
+      isNewUser &&
+      onboardComplete === false &&
+      (url.pathname.startsWith("/student/") ||
+        url.pathname.startsWith("/instructor/"))
+    ) {
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
 
-    // If authenticated, redirect away from auth pages
+    // Redirect authenticated users away from auth pages
     if (
       url.pathname === "/sign-in" ||
       url.pathname === "/sign-up" ||
-      url.pathname.startsWith("/verify/") ||
-      url.pathname === "/onboarding"
+      url.pathname === "/onboarding" ||
+      url.pathname.startsWith("/verify")
     ) {
-      url.pathname = role === "Instructor" ? "/instructor/dashboard" : "/student/dashboard";
+      url.pathname =
+        role === "Instructor"
+          ? "/instructor/dashboard"
+          : "/student/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    // Role-based redirection
+    if (role === "Instructor" && url.pathname.startsWith("/student/")) {
+      url.pathname = "/instructor/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    if (role === "Student" && url.pathname.startsWith("/instructor/")) {
+      url.pathname = "/student/dashboard";
       return NextResponse.redirect(url);
     }
   } else {
-    // If no token and not on allowed pages (sign-in, sign-up, onboarding)
+    // Publicly accessible pages
     if (
       url.pathname === "/sign-in" ||
       url.pathname === "/sign-up" ||
@@ -64,15 +80,21 @@ export async function middleware(req: NextRequest) {
       return NextResponse.next();
     }
 
-    // Redirect to sign-in if unauthenticated
+    // Redirect unauthenticated users
     url.pathname = "/sign-in";
     return NextResponse.redirect(url);
   }
 
-  // If all conditions are passed, continue to the next middleware or route
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/sign-in", "/sign-up", "/onboarding", "/verify/:path*"], // Pages to check for middleware
+  matcher: [
+    "/sign-in",
+    "/sign-up",
+    "/onboarding",
+    "/verify/:path*",
+    "/student/:path*",
+    "/instructor/:path*",
+  ],
 };

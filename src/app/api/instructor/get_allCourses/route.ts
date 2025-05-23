@@ -1,8 +1,7 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/options';
-import dbConnection from '@/lib/dbConnect';
-import sql from 'mssql';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import connectToDatabase from "@/lib/dbConnect";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -11,7 +10,7 @@ export async function GET() {
   }
 
   try {
-    await dbConnection();
+    const pool = await connectToDatabase();
     const userId = parseInt(session.user.id, 10);
 
     if (isNaN(userId)) {
@@ -21,22 +20,37 @@ export async function GET() {
       );
     }
 
+    // Updated query with proper case-sensitive table and column names
     const query = `
-      SELECT * FROM Courses
-      WHERE InstructorID = @userId
+      SELECT 
+        "CourseID",
+        "Title",
+        "Description",
+        "Category",
+        "DifficultyLevel",
+        "Skills",
+        "Status",
+        "Fees",
+        "InstructorID",
+        "Rating",
+        "ThumbnailPublicID",
+        "CreatedAt"
+      FROM "Courses"
+      WHERE "InstructorID" = $1
     `;
 
-    // Correct way to pass parameters in mssql
-    const requestQuery = new sql.Request();
-    requestQuery.input('userId', sql.Int, userId);
-    // Execute the query
-    const result = await requestQuery.query(query);
-
-    const courses = result.recordset;
+    const result = await pool.query(query, [userId]);
+    const courses = result.rows;
 
     return NextResponse.json(courses);
-  } catch (error) {
-    console.error('Error fetching courses:', error);
-    return NextResponse.json({ message: 'Error fetching courses' }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error fetching courses:", error);
+    return NextResponse.json(
+      { 
+        message: "Error fetching courses",
+        error: error.message 
+      },
+      { status: 500 }
+    );
   }
 }

@@ -2,7 +2,6 @@ import { v4 as uuidv4 } from "uuid";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
-import sql, { ConnectionPool } from "mssql";
 import connectToDatabase from "@/lib/dbConnect";
 import { uploadToAzure } from "@/lib/azure-blob-storage";
 
@@ -47,16 +46,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const pool: ConnectionPool = await connectToDatabase();
+    const pool = await connectToDatabase();
 
     let thumbnailUrl = null;
     if (courseThumbnail) {
       try {
         const fileBuffer = Buffer.from(await courseThumbnail.arrayBuffer());
-        const fileExtension = courseThumbnail.name.split(".").pop(); // Get file extension
-        const uniqueFilename = `${uuidv4()}.${fileExtension}`; // Generate unique filename
+        const fileExtension = courseThumbnail.name.split(".").pop();
+        const uniqueFilename = `${uuidv4()}.${fileExtension}`;
 
-        thumbnailUrl = await uploadToAzure(fileBuffer, uniqueFilename , false);
+        thumbnailUrl = await uploadToAzure(fileBuffer, uniqueFilename, false);
       } catch (uploadError) {
         console.error("Error uploading to Azure Blob Storage:", uploadError);
         return NextResponse.json(
@@ -66,31 +65,48 @@ export async function POST(req: Request) {
       }
     }
 
+    // PostgreSQL query with parameterized values matching your schema
     const insertQuery = `
-      INSERT INTO Courses (Title, Description, Category, DifficultyLevel, Skills, Fees, InstructorID, ThumbnailPublicID)
-      VALUES (@title, @description, @category, @skillLevel, @skills, @price, @instructor_id, @ThumbnailPublicID)
+      INSERT INTO "Courses" (
+        "Title", 
+        "Description", 
+        "Category", 
+        "DifficultyLevel", 
+        "Skills", 
+        "Fees", 
+        "InstructorID", 
+        "ThumbnailPublicID",
+        "Status"
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING "CourseID"
     `;
 
-    const request = pool.request();
-    request.input("title", sql.NVarChar, title);
-    request.input("description", sql.NVarChar, description);
-    request.input("category", sql.NVarChar, category);
-    request.input("skillLevel", sql.NVarChar, skillLevel);
-    request.input("skills", sql.NVarChar, skills.split(",").map((skill: string) => skill.trim()).join(","));
-    request.input("price", sql.Decimal, parseFloat(price));
-    request.input("instructor_id", sql.Int, instructor_id);
-    request.input("ThumbnailPublicID", sql.NVarChar, thumbnailUrl);
+    const values = [
+      title,
+      description,
+      category,
+      skillLevel,
+      skills.split(",").map((skill: string) => skill.trim()).join(","),
+      parseFloat(price),
+      instructor_id,
+      thumbnailUrl,
+      'draft' // Default status from your schema
+    ];
 
-    await request.query(insertQuery);
+    const result = await pool.query(insertQuery, values);
 
     return NextResponse.json(
-      { message: "Course created successfully" },
+      { 
+        message: "Course created successfully",
+        courseId: result.rows[0].CourseID 
+      },
       { status: 201 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating course:", error);
     return NextResponse.json(
-      { message: "Error creating course" },
+      { message: "Error creating course", error: error.message },
       { status: 500 }
     );
   }

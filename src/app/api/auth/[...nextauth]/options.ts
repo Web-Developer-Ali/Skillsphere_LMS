@@ -3,7 +3,6 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcrypt";
 import connectToDatabase from "@/lib/dbConnect";
-import sql from "mssql";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -18,25 +17,33 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(
-        credentials: Record<"email" | "password", string> | undefined
-      ) {
+      async authorize(credentials: Record<"email" | "password", string> | undefined) {
         if (!credentials) throw new Error("No credentials provided");
 
         const pool = await connectToDatabase();
 
         try {
           const { email, password } = credentials;
-          // Fetch user from SQL database
-          const result = await pool
-            .request()
-            .input("Email", sql.NVarChar, email).query(`
-      SELECT UserID, FullName, Email, Password, IsVerified, OnboardComplete, AvatarSecureURL, UserType 
-      FROM Users 
-      WHERE Email = @Email
-    `);
+          // Fetch user from PostgreSQL database
+          const result = await pool.query(`
+            SELECT 
+              "UserID", 
+              "FullName", 
+              "Email", 
+              "Password", 
+              "IsVerified", 
+              "OnboardComplete", 
+              "AvatarSecureURL", 
+              "UserType" 
+            FROM "Users" 
+            WHERE "Email" = $1
+          `, [email]);
 
-          const userRecord = result.recordset[0];
+          const userRecord = result.rows[0];
+          if (!userRecord) {
+            throw new Error("Invalid email or password");
+          }
+
           // Check if the user is verified
           if (!userRecord.IsVerified) {
             console.warn("Error: User not verified for email:", email);
@@ -45,10 +52,7 @@ export const authOptions: NextAuthOptions = {
 
           // Validate the password
           const hashedPassword = userRecord.Password.toString();
-          const isPasswordCorrect = await bcrypt.compare(
-            password,
-            hashedPassword
-          );
+          const isPasswordCorrect = await bcrypt.compare(password, hashedPassword);
           if (!isPasswordCorrect) {
             throw new Error("Invalid email or password");
           }
@@ -65,17 +69,20 @@ export const authOptions: NextAuthOptions = {
           };
         } catch (error) {
           console.error("Error authorizing user:", error);
-          throw new Error(
-            "Error during authentication , Invalid email or password"
-          );
+          throw new Error("Error during authentication, Invalid email or password");
         }
       },
     }),
   ],
 
   callbacks: {
-    async jwt({ token, user, account, profile }) {
+    async jwt({ token, user, account, profile, session, trigger }) {
       const pool = await connectToDatabase();
+
+      if (trigger === "update" && session?.onboardComplete) {
+        token.onboardComplete = session.onboardComplete;
+        token.role = session.role;
+      }
 
       // Handle Google login
       if (account?.provider === "google") {
@@ -83,34 +90,38 @@ export const authOptions: NextAuthOptions = {
           const email = profile?.email;
 
           // Check if user exists
-          const existingUserResult = await pool
-            .request()
-            .input("email", sql.NVarChar, email)
-            .query("SELECT * FROM Users WHERE Email = @email");
+          const existingUserResult = await pool.query(
+            `SELECT * FROM "Users" WHERE "Email" = $1`,
+            [email]
+          );
 
-          const existingUser = existingUserResult.recordset[0];
+          const existingUser = existingUserResult.rows[0];
           let newUserId = null;
 
           if (!existingUser) {
-            // Create new user in SQL database with default UserType 'Student'
-            const insertResult = await pool
-              .request()
-              .input("full_Name", sql.NVarChar, profile?.name)
-              .input("email", sql.NVarChar, profile?.email)
-              .input(
-                "avatar",
-                sql.NVarChar,
-                (profile as { picture?: string })?.picture || ""
-              )
-              .input("userType", sql.NVarChar, "Student") // Default value
-              .query(`
-                INSERT INTO Users (FullName, Email, IsVerified, OnboardComplete, AvatarSecureURL, UserType) 
-                OUTPUT INSERTED.UserID 
-                VALUES (@full_Name, @email, 1, 0, @avatar, @userType)
-              `);
+            // Create new user in PostgreSQL database with default UserType 'Student'
+            const insertResult = await pool.query(
+              `INSERT INTO "Users" (
+                "FullName", 
+                "Email", 
+                "IsVerified", 
+                "OnboardComplete", 
+                "AvatarSecureURL", 
+                "UserType"
+              ) 
+              VALUES ($1, $2, $3, $4, $5, $6) 
+              RETURNING "UserID"`,
+              [
+                profile?.name,
+                profile?.email,
+                true, // IsVerified
+                false, // OnboardComplete
+                (profile as { picture?: string })?.picture || "",
+                "Student" // Default value
+              ]
+            );
 
-            newUserId = insertResult.recordset[0].UserID;
-
+            newUserId = insertResult.rows[0].UserID;
             token.isNewUser = true;
             token.onboardComplete = false;
           } else {
@@ -166,7 +177,7 @@ export const authOptions: NextAuthOptions = {
 
   session: {
     strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60,
     updateAge: 24 * 60 * 60,
   },
 

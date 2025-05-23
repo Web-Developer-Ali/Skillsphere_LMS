@@ -35,7 +35,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-
+import nprogress from 'nprogress'; 
+import 'nprogress/nprogress.css';
 const studentSchema = z.object({
   age: z
     .number()
@@ -103,6 +104,7 @@ export default function OnboardingPageContent() {
   }, [form, isStudent]);
 
   async function onSubmit(values: FormValues) {
+    nprogress.start();
     try {
       const response = await axios.put("/api/registeration/onboarding", {
         ...values,
@@ -119,7 +121,7 @@ export default function OnboardingPageContent() {
             description: "Your profile has been set up successfully.",
           });
           router.push(
-            isStudent ? "/dashboard/student" : "/dashboard/instructor"
+            isStudent ? "/student/dashboard" : "/instructor/dashboard"
           );
         } else {
           router.replace(
@@ -133,17 +135,20 @@ export default function OnboardingPageContent() {
         description: "We couldn't update your profile. Please try again.",
         variant: "destructive",
       });
+    }finally {
+      nprogress.done();
     }
   }
 
   return (
-    <div className="container max-w-lg mx-auto px-4 py-8">
-      <Card className="w-full">
+    <div className="min-h-screen dark:bg-gray-900">
+      <div className="container max-w-lg mx-auto px-4 py-8 dark:bg-gray-900">
+      <Card className="w-full dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">
+          <CardTitle className="text-2xl font-bold text-center dark:text-white">
             Complete Your Profile
           </CardTitle>
-          <CardDescription className="text-center">
+          <CardDescription className="text-center dark:text-gray-300">
             Let&#39;s personalize your SkillSphere experience
           </CardDescription>
         </CardHeader>
@@ -156,28 +161,36 @@ export default function OnboardingPageContent() {
                 name="userType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>I am a</FormLabel>
+                    <FormLabel className="dark:text-gray-300">I am a</FormLabel>
                     <Select
                       onValueChange={(value) => {
-                        // Explicitly ensure value is "Student" | "Instructor"
                         const userType = value as "Student" | "Instructor";
                         field.onChange(userType);
                         setIsStudent(userType === "Student");
-                        form.reset({ userType }); // Ensure compatibility with the schema
+                        form.reset({ userType });
                       }}
                       value={field.value}
                     >
                       <FormControl>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400">
                           <SelectValue placeholder="Select your role" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Student">Student</SelectItem>
-                        <SelectItem value="Instructor">Instructor</SelectItem>
+                      <SelectContent className="dark:bg-gray-700 dark:border-gray-600">
+                        <SelectItem 
+                          value="Student" 
+                          className="dark:hover:bg-gray-600 dark:text-white dark:hover:text-white dark:focus:bg-gray-600"
+                        >
+                          Student
+                        </SelectItem>
+                        <SelectItem 
+                          value="Instructor"
+                          className="dark:hover:bg-gray-600 dark:text-white dark:hover:text-white dark:focus:bg-gray-600"
+                        >
+                          Instructor
+                        </SelectItem>
                       </SelectContent>
                     </Select>
-
                     <FormMessage />
                   </FormItem>
                 )}
@@ -190,7 +203,7 @@ export default function OnboardingPageContent() {
                     name="age"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Age</FormLabel>
+                        <FormLabel className="dark:text-gray-300">Age</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -203,6 +216,7 @@ export default function OnboardingPageContent() {
                               )
                             }
                             value={field.value || ""}
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -214,14 +228,15 @@ export default function OnboardingPageContent() {
                     name="desire_role"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Desired Role</FormLabel>
+                        <FormLabel className="dark:text-gray-300">Desired Role</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             placeholder="e.g., Web Developer, Data Scientist"
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                           />
                         </FormControl>
-                        <FormDescription>
+                        <FormDescription className="dark:text-gray-400">
                           What role are you aspiring to?
                         </FormDescription>
                         <FormMessage />
@@ -236,11 +251,12 @@ export default function OnboardingPageContent() {
                     name="bio"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Bio</FormLabel>
+                        <FormLabel className="dark:text-gray-300">Bio</FormLabel>
                         <FormControl>
                           <Textarea
                             {...field}
                             placeholder="Tell us about yourself and your teaching experience"
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                           />
                         </FormControl>
                         <FormMessage />
@@ -252,14 +268,15 @@ export default function OnboardingPageContent() {
                     name="expertise"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Area of Expertise</FormLabel>
+                        <FormLabel className="dark:text-gray-300">Area of Expertise</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
                             placeholder="e.g., JavaScript, Machine Learning"
+                            className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                           />
                         </FormControl>
-                        <FormDescription>
+                        <FormDescription className="dark:text-gray-400">
                           What subjects do you specialize in teaching?
                         </FormDescription>
                         <FormMessage />
@@ -268,7 +285,10 @@ export default function OnboardingPageContent() {
                   />
                 </>
               )}
-              <Button className="w-full" type="submit">
+              <Button 
+                className="w-full dark:bg-primary dark:hover:bg-primary/90" 
+                type="submit"
+              >
                 Complete Profile
               </Button>
             </form>
@@ -276,5 +296,7 @@ export default function OnboardingPageContent() {
         </CardContent>
       </Card>
     </div>
+    </div>
+    
   );
 }

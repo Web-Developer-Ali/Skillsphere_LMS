@@ -83,75 +83,97 @@ export default function SignUpPage() {
   };
 
   return (
-    <section className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
-      <Card className="w-full max-w-md">
+    <section className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md dark:bg-gray-800 dark:border-gray-700 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">
+          <CardTitle className="text-2xl font-bold text-center dark:text-white">
             Create an account
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="fullName" className="dark:text-gray-300">
+                Full Name
+              </Label>
               <Input
                 id="fullName"
                 placeholder="Your full name"
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 {...register("fullName")}
               />
               {errors.fullName && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-red-500 dark:text-red-400">
                   {errors.fullName.message}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="dark:text-gray-300">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
                 placeholder="name@example.com"
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 {...register("email")}
               />
               {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
+                <p className="text-sm text-red-500 dark:text-red-400">
+                  {errors.email.message}
+                </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" {...register("password")} />
+              <Label htmlFor="password" className="dark:text-gray-300">
+                Password
+              </Label>
+              <Input 
+                id="password" 
+                type="password" 
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                {...register("password")} 
+              />
               {errors.password && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-red-500 dark:text-red-400">
                   {errors.password.message}
                 </p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="dark:text-gray-300">
+                Confirm Password
+              </Label>
               <Input
                 id="confirmPassword"
                 type="password"
+                className="dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
                 {...register("confirmPassword")}
               />
               {errors.confirmPassword && (
-                <p className="text-sm text-red-500">
+                <p className="text-sm text-red-500 dark:text-red-400">
                   {errors.confirmPassword.message}
                 </p>
               )}
             </div>
             <div className="flex items-center space-x-2">
-              <Checkbox id="terms" />
-              <Label htmlFor="terms" className="text-sm">
+              <Checkbox id="terms" className="dark:border-gray-600" />
+              <Label htmlFor="terms" className="text-sm dark:text-gray-300">
                 I accept the{" "}
-                <Link href="#" className="text-blue-500 hover:underline">
+                <Link 
+                  href="#" 
+                  className="text-blue-500 hover:underline dark:text-blue-400"
+                >
                   Terms and Conditions
                 </Link>
               </Label>
             </div>
-            {/* {errors.terms && (
-              <p className="text-sm text-red-500">{errors.terms.message}</p>
-            )} */}
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full dark:bg-primary dark:hover:bg-primary/90" 
+              disabled={isLoading}
+            >
               {isLoading ? "Creating account..." : "Create an account"}
             </Button>
           </form>
@@ -160,14 +182,17 @@ export default function SignUpPage() {
               variant="outline"
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full"
+              className="w-full dark:border-gray-600 dark:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
             >
               Sign in with Google
             </Button>
           </div>
-          <p className="mt-4 text-center text-sm text-gray-500">
+          <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
             Already have an account?{" "}
-            <Link href="/sign-in" className="text-blue-500 hover:underline">
+            <Link 
+              href="/sign-in" 
+              className="text-blue-500 hover:underline dark:text-blue-400"
+            >
               Sign in here
             </Link>
           </p>

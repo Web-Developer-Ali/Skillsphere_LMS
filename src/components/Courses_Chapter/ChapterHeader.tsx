@@ -16,7 +16,7 @@ export const ChapterHeader = ({
 }: ChapterHeaderProps) => {
   const router = useRouter()
   const handleExit = () => {
-    router.push(`/instructor/courses_details_page?id=${id}`)
+    router.push(`/instructor/courses_details_page/${id}`)
   }
 
   return (
@@ -32,7 +32,7 @@ export const ChapterHeader = ({
       <div className="flex items-center space-x-4">
         <Button
           variant="outline"
-          className="dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700"
+          className="dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white"
           onClick={handleExit}
         >
           Exit

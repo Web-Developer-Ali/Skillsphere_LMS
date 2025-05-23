@@ -1,22 +1,18 @@
-import sql from "mssql";
-import dbConnection from "@/lib/dbConnect"; // Ensure this sets up your SQL Server connection
+import dbConnection from "@/lib/dbConnect";
 
 export async function POST(request: Request) {
-  const pool = await dbConnection(); // Get the database connection
+  const pool = await dbConnection();
   try {
     const { id, code } = await request.json();
-console.log(id)
+    
     // Fetch user details from the database
-    const userResult = await pool
-      .request()
-      .input("UserID", sql.Int, id)
-      .query(`
-        SELECT VerifyCode, ExpireVerifyCode, IsVerified 
-        FROM Users 
-        WHERE UserID = @UserID
-      `);
+    const userResult = await pool.query(`
+      SELECT "VerifyCode", "ExpireVerifyCode", "IsVerified" 
+      FROM "Users" 
+      WHERE "UserID" = $1
+    `, [id]);
 
-    if (userResult.recordset.length === 0) {
+    if (userResult.rows.length === 0) {
       return Response.json(
         {
           success: false,
@@ -26,7 +22,7 @@ console.log(id)
       );
     }
 
-    const user = userResult.recordset[0];
+    const user = userResult.rows[0];
 
     // Check if the user is already verified
     if (user.IsVerified) {
@@ -40,19 +36,15 @@ console.log(id)
     }
 
     const isValidCode = user.VerifyCode === code;
-    const isCodeExpire =
-      user.ExpireVerifyCode && new Date(user.ExpireVerifyCode) > new Date();
+    const isCodeExpired = user.ExpireVerifyCode && new Date(user.ExpireVerifyCode) < new Date();
 
-    if (isValidCode && isCodeExpire) {
+    if (isValidCode && !isCodeExpired) {
       // Update user verification status
-      await pool
-        .request()
-        .input("UserID", sql.Int, id)
-        .query(`
-          UPDATE Users 
-          SET IsVerified = 1, UpdatedAt = GETDATE() 
-          WHERE UserID = @UserID
-        `);
+      await pool.query(`
+        UPDATE "Users" 
+        SET "IsVerified" = true, "UpdatedAt" = NOW() 
+        WHERE "UserID" = $1
+      `, [id]);
 
       return Response.json(
         {
@@ -61,7 +53,7 @@ console.log(id)
         },
         { status: 200 }
       );
-    } else if (!isCodeExpire) {
+    } else if (isCodeExpired) {
       return Response.json(
         {
           success: false,

@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import sql from "mssql";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/options";
 import connectToDatabase from "@/lib/dbConnect";
-import { deleteBlob, uploadToAzure } from "@/lib/azure-blob-storage";
-import { v4 as uuidv4 } from "uuid";
 
-// GET method to retrieve a course by ID along with its chapters
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
@@ -22,16 +18,21 @@ export async function GET(req: NextRequest) {
     const pool = await connectToDatabase();
 
     // Fetch course details
-    const courseResult = await pool
-      .request()
-      .input("CourseID", sql.Int, Number(id))
-      .query(`
-        SELECT CourseID, Title, Description, Skills, Status, Fees, InstructorID, ThumbnailPublicID
-        FROM Courses 
-        WHERE CourseID = @CourseID
-      `);
+    const courseResult = await pool.query(`
+      SELECT 
+        "CourseID", 
+        "Title", 
+        "Description", 
+        "Skills", 
+        "Status", 
+        "Fees", 
+        "InstructorID", 
+        "ThumbnailPublicID"
+      FROM "Courses" 
+      WHERE "CourseID" = $1
+    `, [Number(id)]);
 
-    if (courseResult.recordset.length === 0) {
+    if (courseResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, message: "Course not found" },
         { status: 404 }
@@ -39,24 +40,24 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch chapters for the course
-    const chaptersResult = await pool
-      .request()
-      .input("CourseID", sql.Int, Number(id))
-      .query(`
-        SELECT ChapterCount, Title, ChapterID
-        FROM Courses_Chapters
-        WHERE CourseID = @CourseID
-        ORDER BY ChapterCount ASC
-      `);
+    const chaptersResult = await pool.query(`
+      SELECT 
+        "ChapterCount", 
+        "Title", 
+        "ChapterID"
+      FROM "Courses_Chapters"
+      WHERE "CourseID" = $1
+      ORDER BY "ChapterCount" ASC
+    `, [Number(id)]);
 
-    const courseDetails = courseResult.recordset[0];
-    const chapters = chaptersResult.recordset;
+    const courseDetails = courseResult.rows[0];
+    const chapters = chaptersResult.rows;
 
     return NextResponse.json(
       {
         success: true,
         CourseDetails: courseDetails,
-        Chapters: chapters, // Include chapters in the response
+        Chapters: chapters,
       },
       { status: 200 }
     );
@@ -69,7 +70,10 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// API for updating course details
+
+import { deleteBlob, uploadToAzure } from "@/lib/azure-blob-storage";
+import { v4 as uuidv4 } from "uuid";
+
 export async function PUT(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -90,26 +94,24 @@ export async function PUT(req: NextRequest) {
     const pool = await connectToDatabase();
 
     // Fetch course details (Instructor ID & existing thumbnail)
-    const { recordset: courseCheck } = await pool
-      .request()
-      .input("CourseID", sql.Int, Number(id))
-      .query(
-        "SELECT InstructorID, ThumbnailPublicID FROM Courses WHERE CourseID = @CourseID"
-      );
+    const courseCheck = await pool.query(
+      `SELECT "InstructorID", "ThumbnailPublicID" FROM "Courses" WHERE "CourseID" = $1`,
+      [Number(id)]
+    );
 
-    if (courseCheck.length === 0) {
+    if (courseCheck.rows.length === 0) {
       return NextResponse.json(
         { message: "Course not found" },
         { status: 404 }
       );
     }
 
-    if (courseCheck[0].InstructorID !== session.user.id) {
+    if (Number(courseCheck.rows[0].InstructorID) !== Number(session.user.id)) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 403 });
     }
 
-    const oldThumbnailPublicID = courseCheck[0].ThumbnailPublicID;
-    const updates: Record<string, string | number | boolean | null> = {}; // Store updates
+    const oldThumbnailPublicID = courseCheck.rows[0].ThumbnailPublicID;
+    const updates: Record<string, string | number | boolean | null> = {};
 
     const allowedFields = [
       "Title",
@@ -118,7 +120,6 @@ export async function PUT(req: NextRequest) {
       "Status",
       "Fees",
       "ThumbnailPublicID",
-      // Removed "ChapterCount" from allowed fields
     ];
 
     // Detect Content-Type
@@ -129,11 +130,10 @@ export async function PUT(req: NextRequest) {
       const file = formData.get("ThumbnailPublicID") as File | null;
 
       if (file) {
-        const arrayBuffer = await file.arrayBuffer(); // Convert to ArrayBuffer
-        const fileBuffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
+        const arrayBuffer = await file.arrayBuffer();
+        const fileBuffer = Buffer.from(arrayBuffer);
         const newThumbnailPublicID = `${uuidv4()}.${file.name}`;
 
-        // Upload new file & delete the old one in parallel
         await Promise.all([
           oldThumbnailPublicID ? deleteBlob(oldThumbnailPublicID, false) : Promise.resolve(),
           uploadToAzure(fileBuffer, newThumbnailPublicID, false),
@@ -142,11 +142,10 @@ export async function PUT(req: NextRequest) {
         updates["ThumbnailPublicID"] = newThumbnailPublicID;
       }
 
-      // Handle other form fields
       allowedFields.forEach((key) => {
         const value = formData.get(key);
         if (value !== null && key !== "ThumbnailPublicID") {
-          updates[key] = value.toString(); // Ensure the value is converted to string
+          updates[key] = value.toString();
         }
       });
     } else if (contentType.includes("application/json")) {
@@ -171,25 +170,24 @@ export async function PUT(req: NextRequest) {
     }
 
     // Dynamically build update query for Courses table
-    let query = "UPDATE Courses SET ";
+    let query = 'UPDATE "Courses" SET ';
     const updateClauses: string[] = [];
-    const request = pool.request();
+    const values: any[] = [];
+    let paramIndex = 1;
 
-    Object.entries(updates).forEach(([key, value], index) => {
-      const paramName = `param${index}`;
-      updateClauses.push(`${key} = @${paramName}`);
-      request.input(paramName, value);
+    Object.entries(updates).forEach(([key, value]) => {
+      updateClauses.push(`"${key}" = $${paramIndex}`);
+      values.push(value);
+      paramIndex++;
     });
 
-    query += updateClauses.join(", ") + " WHERE CourseID = @CourseID";
-    request.input("CourseID", sql.Int, Number(id));
+    query += updateClauses.join(", ") + ' WHERE "CourseID" = $' + paramIndex;
+    values.push(Number(id));
 
-    await request.query(query);
-
-    // Removed the logic for updating ChapterCount in Courses_Chapters table
+    await pool.query(query, values);
 
     return NextResponse.json(
-      { message: "Course updated successfully", updates }, // Updated success message
+      { message: "Course updated successfully", updates },
       { status: 200 }
     );
   } catch (error) {

@@ -6,7 +6,7 @@ import { LayoutGrid } from "lucide-react"
 import dynamic from "next/dynamic"
 import { UseFormReturn } from "react-hook-form";
 const ReactQuill = dynamic(() => import("react-quill"), { ssr: false })
-import "react-quill/dist/quill.snow.css"
+import "../../app/quill-dark.css"
 
 interface FormValues {
   title: string;

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import dbConnection from "@/lib/dbConnect";
-import sql from "mssql";
+import connectToDatabase from "@/lib/dbConnect";
 import { deleteBlob } from "@/lib/azure-blob-storage";
 
 export async function DELETE(request: NextRequest) {
@@ -11,20 +10,22 @@ export async function DELETE(request: NextRequest) {
   const courseId = searchParams.get("id");
   const InstructorID = searchParams.get("InstructorID");
   const ThumbnailPublicID = searchParams.get("ThumbnailPublicID");
-  // Check if the user is authenticated
+
+  // Check authentication
   if (
     !session ||
     !session.user ||
     !session.user.id ||
-    Number(InstructorID) !== session.user.id
+    Number(InstructorID) !== Number(session.user.id)
   ) {
     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
   }
 
+  let pool;
   try {
-    await dbConnection();
-
+    pool = await connectToDatabase();
     const userId = parseInt(session.user.id, 10);
+    
     if (isNaN(userId)) {
       return NextResponse.json(
         { error: "Invalid instructor ID" },
@@ -37,80 +38,111 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Invalid course ID" }, { status: 400 });
     }
 
-    // Check if the course belongs to the authenticated instructor
+    // Check course ownership
     const checkCourseQuery = `
-      SELECT CourseID FROM Courses
-      WHERE CourseID = @courseId AND InstructorID = @userId
+      SELECT "CourseID" FROM "Courses"
+      WHERE "CourseID" = $1 AND "InstructorID" = $2
     `;
+    const checkCourseResult = await pool.query(checkCourseQuery, [
+      Number(courseId),
+      userId
+    ]);
 
-    const checkCourseRequest = new sql.Request();
-    checkCourseRequest.input("courseId", sql.Int, Number(courseId));
-    checkCourseRequest.input("userId", sql.Int, userId);
-    const checkCourseResult = await checkCourseRequest.query(checkCourseQuery);
-
-    if (checkCourseResult.recordset.length === 0) {
+    if (checkCourseResult.rows.length === 0) {
       return NextResponse.json(
         { error: "Course not found or unauthorized" },
         { status: 404 }
       );
     }
 
-    // Check if there are any chapters associated with the course
+    // Check for chapters
     const checkChaptersQuery = `
-      SELECT ChapterID FROM Courses_Chapters
-      WHERE CourseID = @courseId
+      SELECT "ChapterID" FROM "Courses_Chapters"
+      WHERE "CourseID" = $1
     `;
+    const checkChaptersResult = await pool.query(checkChaptersQuery, [
+      Number(courseId)
+    ]);
 
-    const checkChaptersRequest = new sql.Request();
-    checkChaptersRequest.input("courseId", sql.Int, Number(courseId));
-    const checkChaptersResult = await checkChaptersRequest.query(
-      checkChaptersQuery
-    );
-
-    if (checkChaptersResult.recordset.length > 0) {
+    if (checkChaptersResult.rows.length > 0) {
       return NextResponse.json(
         { error: "Please delete all chapters before deleting the course." },
         { status: 400 }
       );
     }
 
-    if (ThumbnailPublicID) {
-      await deleteBlob(ThumbnailPublicID, false);
-    } else {
-      return NextResponse.json(
-        { error: "Failed to delete course Thumnail image.Try Again" },
-        { status: 500 }
-      );
-    }
-
-    // Delete the course
-    const deleteQuery = `
-      DELETE FROM Courses
-      WHERE CourseID = @courseId AND InstructorID = @userId
+    // Check for enrollments
+    const checkEnrollmentsQuery = `
+      SELECT "UserID" FROM "EnrolledCourses"
+      WHERE "CourseID" = $1
+      LIMIT 1
     `;
+    const checkEnrollmentsResult = await pool.query(checkEnrollmentsQuery, [
+      Number(courseId)
+    ]);
 
-    const deleteRequest = new sql.Request();
-    deleteRequest.input("courseId", sql.Int, Number(courseId));
-    deleteRequest.input("userId", sql.Int, userId);
-    const deleteResult = await deleteRequest.query(deleteQuery);
-
-    // Check if the course was deleted
-    if (deleteResult.rowsAffected[0] === 0) {
-      return NextResponse.json(
-        { error: "Failed to delete course" },
-        { status: 500 }
-      );
+    // Delete thumbnail if exists
+    if (ThumbnailPublicID) {
+      try {
+        await deleteBlob(ThumbnailPublicID, false);
+      } catch (blobError) {
+        console.error("Error deleting thumbnail:", blobError);
+        return NextResponse.json(
+          { error: "Failed to delete course thumbnail image" },
+          { status: 500 }
+        );
+      }
     }
 
-    // Return success response
-    return NextResponse.json(
-      { success: true, message: "Course deleted successfully" },
-      { status: 200 }
-    );
-  } catch (error) {
+    // Start transaction for atomic operations
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // First delete all enrollments for this course
+      const deleteEnrollmentsQuery = `
+        DELETE FROM "EnrolledCourses"
+        WHERE "CourseID" = $1
+      `;
+      await client.query(deleteEnrollmentsQuery, [Number(courseId)]);
+
+      // Then delete the course
+      const deleteCourseQuery = `
+        DELETE FROM "Courses"
+        WHERE "CourseID" = $1 AND "InstructorID" = $2
+      `;
+      const deleteResult = await client.query(deleteCourseQuery, [
+        Number(courseId),
+        userId
+      ]);
+
+      if (deleteResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return NextResponse.json(
+          { error: "Failed to delete course" },
+          { status: 500 }
+        );
+      }
+
+      await client.query('COMMIT');
+      
+      return NextResponse.json(
+        { success: true, message: "Course deleted successfully" },
+        { status: 200 }
+      );
+    } catch (transactionError) {
+      await client.query('ROLLBACK');
+      throw transactionError;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
     console.error("Error deleting course:", error);
     return NextResponse.json(
-      { error: "Failed to delete course" },
+      { 
+        error: "Failed to delete course",
+        details: error.message 
+      },
       { status: 500 }
     );
   }

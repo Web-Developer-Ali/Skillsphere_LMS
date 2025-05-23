@@ -6,60 +6,64 @@ import {
   SASProtocol
 } from '@azure/storage-blob';
 
-// Retrieve environment variables
 const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME!;
 const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY!;
-const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME_FOR_IMAGES!;
+const imageContainerName = process.env.AZURE_STORAGE_CONTAINER_NAME_FOR_IMAGES!;
 
-// Ensure required environment variables are available
-if (!accountName || !accountKey || !containerName) {
-  throw new Error('Missing required Azure Storage configuration in environment variables.');
-}
-
-// Handle GET requests
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const blobName = searchParams.get('blobName');
-
-  // Validate the blobName parameter
   if (!blobName) {
     return NextResponse.json(
-      { error: 'Blob name is required.' },
+      { error: 'Blob name is required' },
       { status: 400 }
     );
   }
 
   try {
-    // Create a shared key credential using the account name and key
     const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
-
-    // Define the SAS token parameters
-    const permissions = BlobSASPermissions.parse('r'); // Read permission
-    const startsOn = new Date(new Date().getTime() - 5 * 60 * 1000); // Start 5 minutes earlier to account for clock skew
-    const expiresOn = new Date(new Date().getTime() + 60 * 60 * 1000); // 1 hour from now
+    
+    // Determine content type based on file extension
+    let contentType = 'image/jpeg'; // Default for .jpg/.jpeg
+    if (blobName.endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (blobName.endsWith('.gif')) {
+      contentType = 'image/gif';
+    } else if (blobName.endsWith('.webp')) {
+      contentType = 'image/webp';
+    } else if (blobName.endsWith('.svg')) {
+      contentType = 'image/svg+xml';
+    }
 
     const sasOptions = {
-      containerName,
-      blobName,
-      permissions,
-      startsOn,
-      expiresOn,
+      containerName: imageContainerName,
+      blobName: blobName,
+      permissions: BlobSASPermissions.parse('r'), // Read-only permission
+      startsOn: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      expiresOn: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now (longer expiry for images)
       protocol: SASProtocol.Https,
-      version: '2022-11-02', // Specify the service version
-      resource: 'b' // 'b' for blob
+      contentType,
+      cacheControl: 'public, max-age=86400', // Cache for 24 hours
+      contentDisposition: 'inline',
+      headers: {
+        'x-ms-blob-content-type': contentType,
+        'Access-Control-Allow-Origin': '*'
+      }
     };
 
-    // Generate the SAS token
     const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
+    const encodedBlobName = encodeURIComponent(blobName).replace(/'/g, "%27");
+    const sasURL = `https://${accountName}.blob.core.windows.net/${imageContainerName}/${encodedBlobName}?${sasToken}`;
 
-    // Construct the SAS URL
-    const sasURL = `https://${accountName}.blob.core.windows.net/${containerName}/${blobName}?${sasToken}`;
-        // Return the SAS URL in the response
-    return NextResponse.json({ sasURL });
+    return NextResponse.json({ 
+      sasURL,
+      contentType,
+      expiresOn: sasOptions.expiresOn.toISOString() 
+    });
   } catch (error) {
-    console.error('Error generating SAS URL:', error);
+    console.error('SAS generation error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate SAS URL.' },
+      { error: 'Failed to generate SAS URL', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

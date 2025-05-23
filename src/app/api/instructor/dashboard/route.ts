@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import sql from "mssql";
 import connectToDatabase from "@/lib/dbConnect";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 
 export const dynamic = "force-dynamic";
 
+type Enrollment = {
+  name: string;
+  avatar: string | null;
+  courses: string[];
+};
+
 export async function GET() {
   try {
     // Get session data
-    const session = await getServerSession(authOptions);
-
+    const session = await getServerSession(authOptions);  
     // Check if the user is authenticated and has the role of 'Instructor'
     if (!session || !session.user || session.user.role !== "Instructor") {
       return NextResponse.json(
@@ -19,7 +23,13 @@ export async function GET() {
       );
     }
 
-    const instructorId = session.user.id;
+    const instructorId = parseInt(session.user.id, 10);
+    if (isNaN(instructorId)) {
+      return NextResponse.json(
+        { error: "Invalid instructor ID" },
+        { status: 400 }
+      );
+    }
 
     // Connect to the database
     const pool = await connectToDatabase();
@@ -35,116 +45,102 @@ export async function GET() {
       coursesForStudentsResult,
     ] = await Promise.all([
       // Query for courses data
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT 
-            c.Title AS title,
-            COUNT(u.UserID) AS students,
-            c.Fees AS fees,
-            c.Rating AS rating
-          FROM Courses c
-          LEFT JOIN EnrolledCourses e ON e.CourseID = c.CourseID
-          LEFT JOIN Users u ON u.UserID = e.UserID AND u.UserType = 'Student'
-          WHERE c.InstructorID = @instructorId
-          GROUP BY c.Title, c.Fees, c.Rating
-        `),
+      pool.query(`
+        SELECT 
+          c."Title" AS title,
+          COUNT(u."UserID") AS students,
+          c."Fees" AS fees,
+          c."Rating" AS rating
+        FROM "Courses" c
+        LEFT JOIN "EnrolledCourses" e ON e."CourseID" = c."CourseID"
+        LEFT JOIN "Users" u ON u."UserID" = e."UserID" AND u."UserType" = 'Student'
+        WHERE c."InstructorID" = $1
+        GROUP BY c."Title", c."Fees", c."Rating"
+      `, [instructorId]),
 
       // Query for total students count
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT COUNT(DISTINCT u.UserID) AS total_students
-          FROM Users u
-          JOIN EnrolledCourses e ON e.UserID = u.UserID
-          WHERE u.UserType = 'Student' AND e.CourseID IN (
-            SELECT CourseID FROM Courses WHERE InstructorID = @instructorId
-          )
-        `),
+      pool.query(`
+        SELECT COUNT(DISTINCT u."UserID") AS total_students
+        FROM "Users" u
+        JOIN "EnrolledCourses" e ON e."UserID" = u."UserID"
+        WHERE u."UserType" = 'Student' AND e."CourseID" IN (
+          SELECT "CourseID" FROM "Courses" WHERE "InstructorID" = $1
+        )
+      `, [instructorId]),
 
       // Query for total courses count
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT COUNT(*) AS total_courses
-          FROM Courses
-          WHERE InstructorID = @instructorId
-        `),
+      pool.query(`
+        SELECT COUNT(*) AS total_courses
+        FROM "Courses"
+        WHERE "InstructorID" = $1
+      `, [instructorId]),
 
       // Query for total revenue and average rating
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT 
-            c.Fees, 
-            c.Rating, 
-            COUNT(u.UserID) AS students_count
-          FROM Courses c
-          LEFT JOIN EnrolledCourses e ON e.CourseID = c.CourseID
-          LEFT JOIN Users u ON u.UserID = e.UserID
-          WHERE c.InstructorID = @instructorId
-          GROUP BY c.Fees, c.Rating
-        `),
+      pool.query(`
+        SELECT 
+          c."Fees" AS fees, 
+          c."Rating" AS rating, 
+          COUNT(u."UserID") AS students_count
+        FROM "Courses" c
+        LEFT JOIN "EnrolledCourses" e ON e."CourseID" = c."CourseID"
+        LEFT JOIN "Users" u ON u."UserID" = e."UserID"
+        WHERE c."InstructorID" = $1
+        GROUP BY c."Fees", c."Rating"
+      `, [instructorId]),
 
       // Query for revenue by month
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT 
-            c.Title AS title,
-            c.Fees AS fees,
-            COUNT(u.UserID) AS students_count,
-            FORMAT(c.CreatedAt, 'yyyy-MM') AS month_year
-          FROM Courses c
-          LEFT JOIN EnrolledCourses e ON e.CourseID = c.CourseID
-          LEFT JOIN Users u ON u.UserID = e.UserID AND u.UserType = 'Student'
-          WHERE c.InstructorID = @instructorId
-          GROUP BY c.Title, c.Fees, FORMAT(c.CreatedAt, 'yyyy-MM')
-        `),
+      pool.query(`
+        SELECT 
+          c."Title" AS title,
+          c."Fees" AS fees,
+          COUNT(u."UserID") AS students_count,
+          TO_CHAR(c."CreatedAt", 'YYYY-MM') AS month_year
+        FROM "Courses" c
+        LEFT JOIN "EnrolledCourses" e ON e."CourseID" = c."CourseID"
+        LEFT JOIN "Users" u ON u."UserID" = e."UserID" AND u."UserType" = 'Student'
+        WHERE c."InstructorID" = $1
+        GROUP BY c."Title", c."Fees", TO_CHAR(c."CreatedAt", 'YYYY-MM')
+      `, [instructorId]),
 
       // Query for revenue by course name
-      pool.request()
-        .input("instructorId", sql.Int, instructorId)
-        .query(`
-          SELECT 
-            c.Title AS title,
-            c.Fees AS fees,
-            COUNT(u.UserID) AS students_count
-          FROM Courses c
-          LEFT JOIN EnrolledCourses e ON e.CourseID = c.CourseID
-          LEFT JOIN Users u ON u.UserID = e.UserID AND u.UserType = 'Student'
-          WHERE c.InstructorID = @instructorId
-          GROUP BY c.Title, c.Fees
-        `),
+      pool.query(`
+        SELECT 
+          c."Title" AS title,
+          c."Fees" AS fees,
+          COUNT(u."UserID") AS students_count
+        FROM "Courses" c
+        LEFT JOIN "EnrolledCourses" e ON e."CourseID" = c."CourseID"
+        LEFT JOIN "Users" u ON u."UserID" = e."UserID" AND u."UserType" = 'Student'
+        WHERE c."InstructorID" = $1
+        GROUP BY c."Title", c."Fees"
+      `, [instructorId]),
 
       // Query for courses for students
-      pool.request()
-        .input("InstructorID", sql.Int, instructorId)
-        .query(`
-          SELECT CourseID, Title FROM Courses
-          WHERE InstructorID = @InstructorID
-        `),
+      pool.query(`
+        SELECT "CourseID", "Title" FROM "Courses"
+        WHERE "InstructorID" = $1
+      `, [instructorId]),
     ]);
 
     // Process courses data
-    const courses = coursesResult.recordset.map((course) => ({
+    const courses = coursesResult.rows.map((course) => ({
       name: course.title,
-      students: course.students,
-      revenue: course.fees * course.students,
-      rating: course.rating,
+      students: parseInt(course.students, 10),
+      revenue: parseFloat(course.fees) * parseInt(course.students, 10),
+      rating: parseFloat(course.rating),
     }));
 
     // Process overview data
-    const totalStudents = totalStudentsResult.recordset[0].total_students;
-    const totalCourses = totalCoursesResult.recordset[0].total_courses;
+    const totalStudents = parseInt(totalStudentsResult.rows[0]?.total_students || 0, 10);
+    const totalCourses = parseInt(totalCoursesResult.rows[0]?.total_courses || 0, 10);
 
     let totalRevenue = 0;
     let totalRating = 0;
     let totalCoursesCount = 0;
 
-    revenueAndRatingResult.recordset.forEach((course) => {
-      totalRevenue += course.Fees * course.students_count;
-      totalRating += course.Rating;
+    revenueAndRatingResult.rows.forEach((course) => {
+      totalRevenue += parseFloat(course.fees) * parseInt(course.students_count, 10);
+      totalRating += parseFloat(course.rating);
       totalCoursesCount++;
     });
 
@@ -153,9 +149,9 @@ export async function GET() {
     // Process revenue data
     const revenueByMonth: Record<string, number> = {};
 
-    revenueByMonthResult.recordset.forEach((course) => {
+    revenueByMonthResult.rows.forEach((course) => {
       const monthYear = course.month_year;
-      const revenue = course.fees * course.students_count;
+      const revenue = parseFloat(course.fees) * parseInt(course.students_count, 10);
       revenueByMonth[monthYear] = (revenueByMonth[monthYear] || 0) + revenue;
     });
 
@@ -164,52 +160,46 @@ export async function GET() {
       revenue,
     }));
 
-    const revenueByCourseName = revenueByCourseResult.recordset.map((course) => ({
+    const revenueByCourseName = revenueByCourseResult.rows.map((course) => ({
       name: course.title,
-      revenue: course.fees * course.students_count,
+      revenue: parseFloat(course.fees) * parseInt(course.students_count, 10),
     }));
 
     // Process students data
-    const courseIds = coursesForStudentsResult.recordset
-      .map((course) => course.CourseID)
-      .join(",");
+    const courseIds = coursesForStudentsResult.rows.map((course) => course.CourseID);
+    
+    let enrollmentData: Enrollment[] = [];
+    if (courseIds.length > 0) {
+      // Using ANY with array parameter for IN-like queries
+      const recentEnrollmentsResult = await pool.query(`
+        SELECT u."FullName", u."AvatarSecureURL", ec."CourseID"
+        FROM "Users" u
+        INNER JOIN "EnrolledCourses" ec ON u."UserID" = ec."UserID"
+        WHERE u."UserType" = 'Student' 
+        AND ec."CourseID" = ANY($1::int[])
+        ORDER BY u."CreatedAt" DESC
+        LIMIT 5
+      `, [courseIds]);
 
-    const recentEnrollmentsQuery = `
-      DECLARE @CourseIds NVARCHAR(MAX) = '${courseIds}';
-      EXEC('
-        SELECT u.FullName, u.AvatarSecureURL, ec.CourseID
-        FROM Users u
-        INNER JOIN EnrolledCourses ec ON u.UserID = ec.UserID
-        WHERE u.UserType = ''Student'' AND ec.CourseID IN (' + @CourseIds + ')
-        ORDER BY u.CreatedAt DESC
-        OFFSET 0 ROWS
-        FETCH NEXT 5 ROWS ONLY
-      ');
-    `;
+      enrollmentData = await Promise.all(
+        recentEnrollmentsResult.rows.map(async (student) => {
+          const enrolledCourseResult = await pool.query(`
+            SELECT "Title" FROM "Courses"
+            WHERE "CourseID" = $1
+          `, [student.CourseID]);
 
-    const recentEnrollmentsResult = await pool.request().query(recentEnrollmentsQuery);
+          const courseName = enrolledCourseResult.rows.length
+            ? enrolledCourseResult.rows[0].Title
+            : "Unknown Course";
 
-    const enrollmentData = await Promise.all(
-      recentEnrollmentsResult.recordset.map(async (student) => {
-        const enrolledCourseResult = await pool
-          .request()
-          .input("CourseID", sql.Int, student.CourseID)
-          .query(`
-            SELECT Title FROM Courses
-            WHERE CourseID = @CourseID
-          `);
-
-        const courseName = enrolledCourseResult.recordset.length
-          ? enrolledCourseResult.recordset[0].Title
-          : "Unknown Course";
-
-        return {
-          name: student.FullName,
-          avatar: student.AvatarSecureURL || null,
-          courses: [courseName],
-        };
-      })
-    );
+          return {
+            name: student.FullName,
+            avatar: student.AvatarSecureURL || null,
+            courses: [courseName],
+          };
+        })
+      );
+    }
 
     // Return the combined data
     return NextResponse.json({
@@ -226,10 +216,14 @@ export async function GET() {
       },
       students: enrollmentData,
     });
-  } catch (error) {
-    console.error("Error in merged API:", error);
+  } catch (error: any) {
+    console.error("Error in instructor dashboard API:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", message: "Failed to fetch data." },
+      { 
+        error: "Internal Server Error", 
+        message: "Failed to fetch dashboard data.",
+        details: error.message
+      },
       { status: 500 }
     );
   }

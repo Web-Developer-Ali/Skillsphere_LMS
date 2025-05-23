@@ -158,10 +158,10 @@ export default function InstructorCoursesPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-background dark:bg-gray-900">
+    <div className="min-w-full container mx-auto px-4 py-8 bg-background dark:bg-gray-900">
       {/* Dashboard Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-6 dark:text-white">Instructor Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight mb-6 dark:text-white">Courses</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="dark:bg-gray-800">
@@ -200,18 +200,6 @@ export default function InstructorCoursesPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Card className="dark:bg-gray-800">
-            <CardHeader className="pb-2">
-              <p className="text-sm font-medium text-muted-foreground dark:text-gray-400">Average Rating</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <Star className="mr-2 h-4 w-4 text-yellow-500 dark:text-yellow-400" />
-                <span className="text-2xl font-bold dark:text-white">{stats.averageRating.toFixed(1)}</span>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
@@ -234,7 +222,7 @@ export default function InstructorCoursesPage() {
               <SelectTrigger className="w-[130px] dark:bg-gray-800 dark:text-white">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent className="dark:bg-gray-800">
+              <SelectContent className="dark:bg-gray-800 dark:text-white">
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="published">Published</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>

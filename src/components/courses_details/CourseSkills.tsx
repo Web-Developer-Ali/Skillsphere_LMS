@@ -55,7 +55,7 @@ export default function CourseSkills({ skills, updateCourseField }: CourseSkills
                 variant="outline"
                 size="sm"
                 onClick={addSkill}
-                className="dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700"
+                className="dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add

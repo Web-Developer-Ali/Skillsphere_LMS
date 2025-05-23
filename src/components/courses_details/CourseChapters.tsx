@@ -208,11 +208,11 @@ export default function CourseChapters({ courseId, chapters, onChapterDelete }: 
         <CardHeader>
           <CardTitle className="text-lg font-medium flex items-center justify-between dark:text-white">
             Course Chapters
-            <Link href={`/instructor/add_courses_chapters?id=${courseId}`} passHref>
+            <Link href={`/instructor/add_courses_chapters/${courseId}`} passHref>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700"
+                className="gap-2 dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700 dark:hover:text-white"
               >
                 <Plus className="h-4 w-4" />
                 Add a Chapter

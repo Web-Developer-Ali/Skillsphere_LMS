@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import type React from "react"
 import type { UseFormReturn } from "react-hook-form"
 import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form"
@@ -7,8 +8,10 @@ import { Switch } from "@/components/ui/switch"
 import type { z } from "zod"
 import dynamic from "next/dynamic"
 import "react-quill/dist/quill.snow.css"
+import "../../app/quill-dark.css"
 import type { CourseSchema } from "@/zodScheams/addCourses"
 import { Loader2 } from "lucide-react"
+import { useTheme } from "next-themes" // Assuming you're using next-themes
 
 const ReactQuill = dynamic(() => import("react-quill"), {
   ssr: false,
@@ -26,6 +29,22 @@ interface Add_coursesFormProps {
 }
 
 const Add_coursesForm: React.FC<Add_coursesFormProps> = ({ form }) => {
+  const { theme } = useTheme() // Get current theme
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure component is mounted to avoid SSR mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <FormField
@@ -55,21 +74,29 @@ const Add_coursesForm: React.FC<Add_coursesFormProps> = ({ form }) => {
           <FormItem>
             <FormLabel className="dark:text-gray-200">Course Description</FormLabel>
             <FormControl>
-              <ReactQuill
-                theme="snow"
-                value={field.value}
-                onChange={field.onChange}
-                className="dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                modules={{
-                  toolbar: [
-                    [{ header: [1, 2, false] }],
-                    ["bold", "italic", "underline", "strike", "blockquote"],
-                    [{ list: "ordered" }, { list: "bullet" }],
-                    ["link", "image"],
-                    ["clean"],
-                  ],
-                }}
-              />
+              <div className={theme === "dark" ? "dark-quill" : ""}>
+                <ReactQuill
+                  theme="snow"
+                  value={field.value}
+                  onChange={field.onChange}
+                  className={`${theme === "dark" ? "ql-dark" : ""} rounded-md`}
+                  modules={{
+                    toolbar: [
+                      [{ header: [1, 2, false] }],
+                      ["bold", "italic", "underline", "strike", "blockquote"],
+                      [{ list: "ordered" }, { list: "bullet" }],
+                      ["link", "image"],
+                      ["clean"],
+                    ],
+                  }}
+                  formats={[
+                    "header",
+                    "bold", "italic", "underline", "strike", "blockquote",
+                    "list", "bullet",
+                    "link", "image"
+                  ]}
+                />
+              </div>
             </FormControl>
             <FormDescription className="dark:text-gray-400">
               Provide a detailed description of the course, including its goals and expected outcomes.
@@ -227,4 +254,3 @@ const Add_coursesForm: React.FC<Add_coursesFormProps> = ({ form }) => {
 }
 
 export default Add_coursesForm
-

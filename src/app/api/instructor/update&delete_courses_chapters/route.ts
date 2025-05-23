@@ -3,7 +3,6 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { deleteBlob } from "@/lib/azure-blob-storage";
-import sql from "mssql";
 
 export async function DELETE(req: NextRequest) {
   try {
@@ -28,24 +27,22 @@ export async function DELETE(req: NextRequest) {
     const pool = await connectToDatabase();
 
     // Step 4: Check if the authenticated user is the instructor of the course
-    const checkInstructorRequest = new sql.Request(pool);
     const checkInstructorQuery = `
-      SELECT c.InstructorID
-      FROM Courses_Chapters cc
-      INNER JOIN Courses c ON cc.CourseID = c.CourseID
-      WHERE cc.ChapterID = @chapterId
+      SELECT c."InstructorID"
+      FROM "Courses_Chapters" cc
+      INNER JOIN "Courses" c ON cc."CourseID" = c."CourseID"
+      WHERE cc."ChapterID" = $1
     `;
-    checkInstructorRequest.input("chapterId", sql.Int, parseInt(chapterId));
-    const instructorResult = await checkInstructorRequest.query(checkInstructorQuery);
+    const instructorResult = await pool.query(checkInstructorQuery, [parseInt(chapterId)]);
 
-    if (instructorResult.recordset.length === 0) {
+    if (instructorResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, message: "Chapter not found" },
         { status: 404 }
       );
     }
 
-    const instructorId = instructorResult.recordset[0].InstructorID;
+    const instructorId = instructorResult.rows[0].InstructorID;
 
     // Step 5: Compare session user ID with the instructor ID
     if (session.user.id !== instructorId) {
@@ -56,15 +53,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Step 6: Get the list of blobs associated with the chapter
-    const getBlobsRequest = new sql.Request(pool);
     const getBlobsQuery = `
-      SELECT BlobName
-      FROM ChapterFiles
-      WHERE ChapterID = @chapterId
+      SELECT "BlobName"
+      FROM "ChapterFiles"
+      WHERE "ChapterID" = $1
     `;
-    getBlobsRequest.input("chapterId", sql.Int, parseInt(chapterId));
-    const blobsResult = await getBlobsRequest.query(getBlobsQuery);
-    const blobNames = blobsResult.recordset.map((row) => row.BlobName);
+    const blobsResult = await pool.query(getBlobsQuery, [parseInt(chapterId)]);
+    const blobNames = blobsResult.rows.map((row) => row.BlobName);
 
     // Step 7: Delete the blobs from Azure Storage
     if (blobNames.length > 0) {
@@ -72,22 +67,30 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Step 8: Delete associated files from the ChapterFiles table FIRST
-    const deleteFilesRequest = new sql.Request(pool);
     const deleteFilesQuery = `
-      DELETE FROM ChapterFiles
-      WHERE ChapterID = @chapterId
+      DELETE FROM "ChapterFiles"
+      WHERE "ChapterID" = $1
     `;
-    deleteFilesRequest.input("chapterId", sql.Int, parseInt(chapterId));
-    await deleteFilesRequest.query(deleteFilesQuery);
-   
-    // Step 9: Delete the chapter from the Courses_Chapters table
-    const deleteChapterRequest = new sql.Request(pool);
+    await pool.query(deleteFilesQuery, [parseInt(chapterId)]);
+
+// Step 9: Delete the chapter thumbnail from blob container
+const checkCourseQuery = `
+  SELECT "Thumbnail" 
+  FROM "Courses_Chapters"
+  WHERE "ChapterID" = $1
+`;
+const checkCourseResult = await pool.query(checkCourseQuery, [chapterId]);
+if (checkCourseResult.rows[0]?.Thumbnail) {
+  await deleteBlob(checkCourseResult.rows[0].Thumbnail, false);
+}
+
+    // Step 10: Delete the chapter from the Courses_Chapters table
     const deleteChapterQuery = `
-      DELETE FROM Courses_Chapters
-      WHERE ChapterID = @chapterId
+      DELETE FROM "Courses_Chapters"
+      WHERE "ChapterID" = $1
     `;
-    deleteChapterRequest.input("chapterId", sql.Int, parseInt(chapterId));
-    await deleteChapterRequest.query(deleteChapterQuery);
+    await pool.query(deleteChapterQuery, [parseInt(chapterId)]);
+    
     return NextResponse.json(
       { success: true, message: "Chapter, associated files, and blobs deleted successfully" },
       { status: 200 }
@@ -103,7 +106,6 @@ export async function DELETE(req: NextRequest) {
 
 
 
-// api to change chapter positions.
 export async function PUT(req: NextRequest) {
   try {
     // Step 1: Check authentication
@@ -127,23 +129,21 @@ export async function PUT(req: NextRequest) {
     const pool = await connectToDatabase();
 
     // Step 4: Verify instructor ownership
-    const checkInstructorRequest = new sql.Request(pool);
     const checkInstructorQuery = `
-      SELECT InstructorID
-      FROM Courses
-      WHERE CourseID = @courseId
+      SELECT "InstructorID"
+      FROM "Courses"
+      WHERE "CourseID" = $1
     `;
-    checkInstructorRequest.input("courseId", sql.Int, parseInt(courseId));
-    const instructorResult = await checkInstructorRequest.query(checkInstructorQuery);
+    const instructorResult = await pool.query(checkInstructorQuery, [parseInt(courseId)]);
 
-    if (instructorResult.recordset.length === 0) {
+    if (instructorResult.rows.length === 0) {
       return NextResponse.json(
         { success: false, message: "Course not found" },
         { status: 404 }
       );
     }
 
-    if (instructorResult.recordset[0].InstructorID !== session.user.id) {
+    if (instructorResult.rows[0].InstructorID !== session.user.id) {
       return NextResponse.json(
         { success: false, message: "Not authorized to modify this course" },
         { status: 403 }
@@ -151,58 +151,56 @@ export async function PUT(req: NextRequest) {
     }
 
     // Step 5: Start transaction for updating chapter positions
-    const transaction = new sql.Transaction(pool);
-    await transaction.begin();
-
+    const client = await pool.connect();
     try {
+      await client.query('BEGIN');
+
       // Update each chapter's position
       for (const chapter of chapters) {
-        const updateRequest = new sql.Request(transaction);
         const updateQuery = `
-          UPDATE Courses_Chapters 
+          UPDATE "Courses_Chapters" 
           SET 
-            ChapterCount = @newPosition,
-            UpdatedAt = GETDATE()
+            "ChapterCount" = $1,
+            "UpdatedAt" = NOW()
           WHERE 
-            ChapterID = @chapterId 
-            AND CourseID = @courseId
+            "ChapterID" = $2 
+            AND "CourseID" = $3
         `;
-        
-        updateRequest.input("newPosition", sql.Int, chapter.ChapterCount);
-        updateRequest.input("chapterId", sql.Int, chapter.ChapterID);
-        updateRequest.input("courseId", sql.Int, parseInt(courseId));
-        
-        await updateRequest.query(updateQuery);
+        await client.query(updateQuery, [
+          chapter.ChapterCount,
+          chapter.ChapterID,
+          parseInt(courseId)
+        ]);
       }
 
       // Commit the transaction
-      await transaction.commit();
+      await client.query('COMMIT');
 
       // Fetch updated chapters
-      const getUpdatedChaptersRequest = new sql.Request(pool);
       const getUpdatedChaptersQuery = `
         SELECT 
-          ChapterID,
-          Title,
-          ChapterCount,
-          TranscodingStatus as Status
-        FROM Courses_Chapters 
-        WHERE CourseID = @courseId
-        ORDER BY ChapterCount ASC
+          "ChapterID",
+          "Title",
+          "ChapterCount",
+          "TranscodingStatus" as "Status"
+        FROM "Courses_Chapters" 
+        WHERE "CourseID" = $1
+        ORDER BY "ChapterCount" ASC
       `;
-      getUpdatedChaptersRequest.input("courseId", sql.Int, parseInt(courseId));
-      const updatedChapters = await getUpdatedChaptersRequest.query(getUpdatedChaptersQuery);
+      const updatedChapters = await pool.query(getUpdatedChaptersQuery, [parseInt(courseId)]);
 
       return NextResponse.json({
         success: true,
         message: "Chapter positions updated successfully",
-        chapters: updatedChapters.recordset
+        chapters: updatedChapters.rows
       });
 
     } catch (error) {
       // Rollback on error
-      await transaction.rollback();
+      await client.query('ROLLBACK');
       throw error;
+    } finally {
+      client.release();
     }
 
   } catch (error) {
@@ -213,6 +211,3 @@ export async function PUT(req: NextRequest) {
     );
   }
 }
-
-
-

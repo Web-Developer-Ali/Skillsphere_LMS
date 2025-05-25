@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
@@ -21,7 +23,7 @@ export async function GET(req: Request) {
 
         // Get posts (your existing query)
         let postsQuery = `SELECT * FROM "CommunityPosts" WHERE 1=1`;
-        const postsParams: any[] = [];
+        const postsParams: (string | number)[] = [];
         let paramIndex = 1;
 
         if (parentPostId) {

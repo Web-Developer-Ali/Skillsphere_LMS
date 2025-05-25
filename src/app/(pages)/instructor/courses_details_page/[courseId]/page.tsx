@@ -70,7 +70,7 @@ export default function CourseForm() {
     };
 
     fetchCourseData();
-  }, []);
+  }, [params.courseId]);
 
   // Update course field with debounce
   const updateCourseField = useCallback(

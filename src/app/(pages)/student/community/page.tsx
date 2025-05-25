@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -153,7 +153,7 @@ export default function CommunityPage() {
   };
 
   // Fetch posts
-  const fetchPosts = async () => {
+  const fetchPosts = useCallback(async () => {
     setIsLoadingPosts(true);
     setIsLoadingContributors(true);
     setError(null);
@@ -162,29 +162,24 @@ export default function CommunityPage() {
       if (!response.ok) {
         throw new Error("Failed to fetch posts");
       }
-
+  
       const data = await response.json();
-      console.log(data);
-      // Check if data is an array (direct array response) or has a posts property
       const postsArray = Array.isArray(data) ? data : data.posts;
-
+  
       if (!postsArray) {
         console.error("Invalid response format:", data);
         throw new Error("Invalid response format");
       }
-
-      // Map API posts to component format
+  
       const mappedPosts = postsArray.map(mapApiPostToComponentPost);
       setDiscussions(mappedPosts);
-
-      // Extract all tags from posts and get unique ones for popular tags
+  
       const allTags = postsArray.flatMap(
         (post: { Tags: string[] }) => post.Tags || []
       );
       const uniqueTags = Array.from(new Set(allTags)) as string[];
       setPopularTags(uniqueTags);
-
-      // Calculate top contributors from the posts data
+  
       const contributors = calculateTopContributors(mappedPosts);
       setTopContributors(contributors);
       setIsLoadingContributors(false);
@@ -200,12 +195,12 @@ export default function CommunityPage() {
       setIsLoadingPosts(false);
       setIsLoadingStats(false);
     }
-  };
+  }, [toast]); 
 
   // Initial data fetch
   useEffect(() => {
     fetchPosts();
-  }, []);
+  }, [fetchPosts]);
 
   // Handle post creation
   const handlePostCreated = async (post: {

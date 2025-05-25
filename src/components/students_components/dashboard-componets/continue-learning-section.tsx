@@ -1,34 +1,46 @@
-"use client"
+"use client";
 
-import { memo, useState } from "react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { BookMarked, ChevronRight, Calendar, ArrowRight, Bookmark } from "lucide-react"
-import { BookOpen } from "lucide-react"
+import { memo, useState } from "react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+  BookMarked,
+  ChevronRight,
+  Calendar,
+  ArrowRight,
+  Bookmark,
+} from "lucide-react";
+import { BookOpen } from "lucide-react";
 
 interface Course {
-  CourseID: number
-  Title: string
-  Category: string
-  DifficultyLevel: string
-  CompletionStatus: boolean
-  EnrollmentDate: string
-  ThumbnailPublicID: string
-  Rating?: number
-  Fees: number
-  Description?: string
+  CourseID: number;
+  Title: string;
+  Category: string;
+  DifficultyLevel: string;
+  CompletionStatus: boolean;
+  EnrollmentDate: string;
+  ThumbnailPublicID: string;
+  Rating?: number;
+  Fees: number;
+  Description?: string;
 }
 
 interface ContinueLearningProps {
-  courses: Course[]
-  sasURLs: Record<number, string>
-  formatDate: (dateString: string) => string
-  calculateProgress: (course: Course) => number
-  handleCourseClick: (courseId: number) => void
-  activeTab: string
+  courses: Course[];
+  sasURLs: Record<number, string>;
+  formatDate: (dateString: string) => string;
+  calculateProgress: (course: Course) => number;
+  handleCourseClick: (courseId: number) => void;
+  activeTab: string;
 }
 
 function ContinueLearningSection({
@@ -39,7 +51,7 @@ function ContinueLearningSection({
   handleCourseClick,
   activeTab,
 }: ContinueLearningProps) {
-  const isVisible = activeTab === "overview" || activeTab === "learning"
+  const isVisible = activeTab === "overview" || activeTab === "learning";
 
   return (
     <div className={`mt-8 space-y-4 ${!isVisible ? "hidden md:block" : ""}`}>
@@ -48,7 +60,11 @@ function ContinueLearningSection({
           <BookMarked className="h-5 w-5 text-primary hidden md:inline-block" />
           Continue Learning
         </h2>
-        <Button variant="ghost" size="sm" className="gap-2 dark:text-gray-300 dark:hover:bg-gray-800">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 dark:text-gray-300 dark:hover:bg-gray-800"
+        >
           <span className="hidden sm:inline">View All Courses</span>
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -59,8 +75,10 @@ function ContinueLearningSection({
           <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No courses in progress</h3>
           <p className="text-muted-foreground mb-4 max-w-md">
-            You haven't enrolled in any courses yet. Browse our catalog to find courses that interest you.
+            You haven&apos;t enrolled in any courses yet. Browse our catalog to
+            find courses that interest you.
           </p>
+
           <Button>Browse Courses</Button>
         </div>
       ) : (
@@ -95,14 +113,19 @@ function ContinueLearningSection({
                 </div>
               </div>
               <CardHeader>
-                <CardTitle className="dark:text-white text-center">Explore More Courses</CardTitle>
+                <CardTitle className="dark:text-white text-center">
+                  Explore More Courses
+                </CardTitle>
                 <CardDescription className="dark:text-gray-300 text-center">
                   Find your next learning journey
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-center">
-                  <Button variant="outline" className="w-full dark:border-gray-600 dark:text-gray-300">
+                  <Button
+                    variant="outline"
+                    className="w-full dark:border-gray-600 dark:text-gray-300"
+                  >
                     Browse Catalog
                   </Button>
                 </div>
@@ -112,7 +135,7 @@ function ContinueLearningSection({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // Update the CourseCard component to handle progressive image loading
@@ -124,14 +147,14 @@ const CourseCard = memo(
     calculateProgress,
     handleCourseClick,
   }: {
-    course: Course
-    sasURL?: string
-    formatDate: (dateString: string) => string
-    calculateProgress: (course: Course) => number
-    handleCourseClick: (courseId: number) => void
+    course: Course;
+    sasURL?: string;
+    formatDate: (dateString: string) => string;
+    calculateProgress: (course: Course) => number;
+    handleCourseClick: (courseId: number) => void;
   }) => {
-    const [imageLoaded, setImageLoaded] = useState(false)
-    const placeholderUrl = "/placeholder.svg?height=200&width=400"
+    const [imageLoaded, setImageLoaded] = useState(false);
+    const placeholderUrl = "/placeholder.svg?height=200&width=400";
 
     return (
       <div
@@ -160,11 +183,16 @@ const CourseCard = memo(
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
           </div>
           <CardHeader className="p-4">
-            <CardTitle className="text-base md:text-lg line-clamp-1 dark:text-white">{course.Title}</CardTitle>
+            <CardTitle className="text-base md:text-lg line-clamp-1 dark:text-white">
+              {course.Title}
+            </CardTitle>
             <CardDescription className="dark:text-gray-300">
               <div className="flex items-center justify-between text-sm">
                 <span className="line-clamp-1">{course.Category}</span>
-                <Badge variant="secondary" className="dark:bg-gray-700 dark:text-gray-200 whitespace-nowrap">
+                <Badge
+                  variant="secondary"
+                  className="dark:bg-gray-700 dark:text-gray-200 whitespace-nowrap"
+                >
                   {course.DifficultyLevel}
                 </Badge>
               </div>
@@ -177,16 +205,21 @@ const CourseCard = memo(
                   <Calendar className="h-3 w-3" />
                   {formatDate(course.EnrollmentDate)}
                 </span>
-                <span className="text-primary dark:text-blue-400">{calculateProgress(course)}% Complete</span>
+                <span className="text-primary dark:text-blue-400">
+                  {calculateProgress(course)}% Complete
+                </span>
               </div>
-              <Progress value={calculateProgress(course)} className="h-1.5 dark:bg-gray-700" />
+              <Progress
+                value={calculateProgress(course)}
+                className="h-1.5 dark:bg-gray-700"
+              />
               <div className="pt-2 flex justify-end">
                 <Button
                   size="sm"
                   className="text-xs h-8 gap-1"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    handleCourseClick(course.CourseID)
+                    e.stopPropagation();
+                    handleCourseClick(course.CourseID);
                   }}
                 >
                   Continue <ArrowRight className="h-3 w-3" />
@@ -196,10 +229,9 @@ const CourseCard = memo(
           </CardContent>
         </Card>
       </div>
-    )
-  },
-)
-CourseCard.displayName = "CourseCard"
+    );
+  }
+);
+CourseCard.displayName = "CourseCard";
 
-export default memo(ContinueLearningSection)
-
+export default memo(ContinueLearningSection);

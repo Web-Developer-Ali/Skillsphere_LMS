@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams  } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -36,8 +36,8 @@ export default function PaymentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [price, setPrice] = useState("");
   const { data: session } = useSession();
-  const searchParams = useSearchParams();
-  const courseId = searchParams.get("courseId");
+  const params = useParams();
+  const courseId = params.courseId as string;
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -102,14 +102,17 @@ export default function PaymentForm() {
           }/dashboard?new=true`
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Enrollment error:", error);
-
-      const errorMessage =
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to enroll in course";
-
+    
+      let errorMessage = "Failed to enroll in course";
+      
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.error || error.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+    
       toast({
         title: "Error",
         description: errorMessage,

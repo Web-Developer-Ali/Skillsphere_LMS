@@ -91,7 +91,7 @@ export async function POST(req: Request) {
     } finally {
       client.release();
     }
-  } catch (error) {
+  } catch {
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

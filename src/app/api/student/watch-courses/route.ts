@@ -1,8 +1,10 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
-import { CourseResponse, ErrorResponse } from "@/types/watch-courses-api";
+import { ChapterRow, CourseResponse, ErrorResponse } from "@/types/watch-courses-api";
 
 
 export async function GET(request: Request): Promise<NextResponse<CourseResponse | ErrorResponse>> {
@@ -86,7 +88,7 @@ export async function GET(request: Request): Promise<NextResponse<CourseResponse
                 const chaptersResult = await client.query(chaptersQuery, [courseId]);
                 
                 // Format chapters with all details including description
-                responseData.chapters = chaptersResult.rows.map((chapter: any) => ({
+                responseData.chapters = chaptersResult.rows.map((chapter: ChapterRow) => ({
                     chapterId: Number(chapter.chapterId),
                     title: String(chapter.title),
                     description: String(chapter.description),

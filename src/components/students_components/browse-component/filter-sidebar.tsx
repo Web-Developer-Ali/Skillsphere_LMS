@@ -115,7 +115,7 @@ export default function FilterSidebar({ onFilterChange, initialFilters, isMobile
   }
 
   // Handle touch events specifically for mobile
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = () => {
     // Immediately apply the price change when touch ends
     const newFilters = { ...filters, priceRange: localPrice }
     setFilters(newFilters)

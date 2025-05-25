@@ -14,7 +14,7 @@ type Enrollment = {
 export async function GET() {
   try {
     // Get session data
-    const session = await getServerSession(authOptions);  
+    const session = await getServerSession(authOptions);
     // Check if the user is authenticated and has the role of 'Instructor'
     if (!session || !session.user || session.user.role !== "Instructor") {
       return NextResponse.json(
@@ -167,7 +167,7 @@ export async function GET() {
 
     // Process students data
     const courseIds = coursesForStudentsResult.rows.map((course) => course.CourseID);
-    
+
     let enrollmentData: Enrollment[] = [];
     if (courseIds.length > 0) {
       // Using ANY with array parameter for IN-like queries
@@ -216,15 +216,20 @@ export async function GET() {
       },
       students: enrollmentData,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in instructor dashboard API:", error);
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
     return NextResponse.json(
-      { 
-        error: "Internal Server Error", 
+      {
+        error: "Internal Server Error",
         message: "Failed to fetch dashboard data.",
-        details: error.message
+        details: errorMessage,
       },
       { status: 500 }
     );
   }
+
 }

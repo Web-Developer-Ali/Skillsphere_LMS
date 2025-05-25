@@ -38,9 +38,9 @@ export async function PUT(req: Request) {
     const pool = await dbConnection();
 
     // Start constructing the SQL update query
-    let updateFields: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
+    const updateFields: string[] = [];
+    const values: (string | number | boolean)[] = [];
+    const paramIndex = 1;
 
     // Common parameters
     values.push(parseInt(id, 10)); // $1 - UserID

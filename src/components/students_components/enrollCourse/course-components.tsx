@@ -1,28 +1,40 @@
-"use client"
-import { useRef, useState, useEffect, lazy, Suspense } from "react"
-import type React from "react"
-import Image from "next/image"
-import { PlayCircle, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import type { Course, VideoPlayerHandle, VideoPlayerProps } from "@/types/enrolleCourses"
+"use client";
+import { useRef, useState, useEffect, lazy, Suspense } from "react";
+import type React from "react";
+import Image from "next/image";
+import { PlayCircle, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import type {
+  Course,
+  VideoPlayerHandle,
+  VideoPlayerProps,
+} from "@/types/enrolleCourses";
 
 // Lazy loaded VideoPlayer with proper typing
 const HLSPlayer = lazy<React.FC<VideoPlayerProps>>(
-  () => import("@/components/students_components/watch-courses/video-player"),
-)
+  () => import("@/components/students_components/watch-courses/video-player")
+);
 
 // Course Header Component
 export function CourseHeader({ course }: { course: Course }) {
   return (
     <div className="mb-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{course.title}</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+        {course.title}
+      </h1>
       <p className="text-gray-600 dark:text-gray-300">
         By <span itemProp="instructor">{course.instructor}</span>
       </p>
     </div>
-  )
+  );
 }
 
 // Course Video Preview Component
@@ -32,45 +44,45 @@ export function CourseVideoPreview({
   title,
   instructor,
 }: {
-  videoUrl?: string
-  thumbnailUrl: string | null
-  title: string
-  instructor: string
+  videoUrl?: string;
+  thumbnailUrl: string | null;
+  title: string;
+  instructor: string;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [videoError, setVideoError] = useState<string | null>(null)
-  const playerRef = useRef<VideoPlayerHandle | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const playerRef = useRef<VideoPlayerHandle | null>(null);
 
   // Clean up player on unmount
   useEffect(() => {
     return () => {
-      const player = playerRef.current
+      const player = playerRef.current;
       if (player) {
         try {
-          player.dispose()
+          player.dispose();
         } catch (e) {
-          console.error("Error disposing player:", e)
+          console.error("Error disposing player:", e);
         }
       }
-      playerRef.current = null
-    }
-  }, [])
+      playerRef.current = null;
+    };
+  }, []);
 
   // Handle dialog open/close effects
   useEffect(() => {
     if (!dialogOpen) {
-      const player = playerRef.current
+      const player = playerRef.current;
       if (player) {
         try {
-          player.pause()
+          player.pause();
         } catch (e) {
-          console.error("Error pausing player:", e)
+          console.error("Error pausing player:", e);
         }
       }
     }
-  }, [dialogOpen])
+  }, [dialogOpen]);
 
-  if (!videoUrl) return null
+  if (!videoUrl) return null;
 
   return (
     <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-6">
@@ -110,7 +122,9 @@ export function CourseVideoPreview({
           `}</style>
 
           <div className="relative w-full h-full">
-            <DialogTitle className="sr-only">Course Preview Video: {title}</DialogTitle>
+            <DialogTitle className="sr-only">
+              Course Preview Video: {title}
+            </DialogTitle>
             <DialogDescription className="sr-only">
               Preview video for {title} course by {instructor}
             </DialogDescription>
@@ -131,8 +145,8 @@ export function CourseVideoPreview({
                     <p className="mb-4">{videoError}</p>
                     <Button
                       onClick={() => {
-                        setVideoError(null)
-                        setDialogOpen(true)
+                        setVideoError(null);
+                        setDialogOpen(true);
                       }}
                       variant="outline"
                     >
@@ -148,7 +162,12 @@ export function CourseVideoPreview({
                     </div>
                   }
                 >
-                  <HLSPlayer src={videoUrl} poster={thumbnailUrl || undefined} title={title} autoPlay={true} />
+                  <HLSPlayer
+                    src={videoUrl}
+                    poster={thumbnailUrl || undefined}
+                    title={title}
+                    autoPlay={true}
+                  />
                 </Suspense>
               )}
             </div>
@@ -156,14 +175,16 @@ export function CourseVideoPreview({
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
 
 // Course Content Component
 export function CourseContent({ course }: { course: Course }) {
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-semibold dark:text-white mb-4">About This Course</h2>
+      <h2 className="text-xl font-semibold dark:text-white mb-4">
+        About This Course
+      </h2>
       <div
         className="prose dark:text-white max-w-none"
         dangerouslySetInnerHTML={{ __html: course.description }}
@@ -178,19 +199,25 @@ export function CourseContent({ course }: { course: Course }) {
         </div>
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
           <p className="text-sm text-gray-500 dark:text-gray-400">Level</p>
-          <p className="font-medium dark:text-white" itemProp="educationalLevel">
+          <p
+            className="font-medium dark:text-white"
+            itemProp="educationalLevel"
+          >
             {course.level}
           </p>
         </div>
         <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
           <p className="text-sm text-gray-500 dark:text-gray-400">Students</p>
-          <p className="font-medium dark:text-white" itemProp="numberOfStudents">
+          <p
+            className="font-medium dark:text-white"
+            itemProp="numberOfStudents"
+          >
             {course.studentsEnrolled.toLocaleString()}
           </p>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Course Enrollment Sidebar Component
@@ -199,9 +226,9 @@ export function CourseEnrollmentSidebar({
   enrolling,
   onEnroll,
 }: {
-  course: Course
-  enrolling: boolean
-  onEnroll: () => void
+  course: Course;
+  enrolling: boolean;
+  onEnroll: () => void;
 }) {
   return (
     <aside className="md:w-1/3 bg-gray-50 dark:bg-gray-700 p-6 md:p-8 border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-600">
@@ -213,7 +240,10 @@ export function CourseEnrollmentSidebar({
             itemScope
             itemType="https://schema.org/AggregateRating"
           >
-            <div className="flex items-center" aria-label={`Rating: ${course.rating} out of 5`}>
+            <div
+              className="flex items-center"
+              aria-label={`Rating: ${course.rating} out of 5`}
+            >
               {[...Array(5)].map((_, i) => (
                 <svg
                   key={i}
@@ -232,7 +262,8 @@ export function CourseEnrollmentSidebar({
             </div>
             <span className="ml-2 text-gray-600 dark:text-gray-300">
               <span itemProp="ratingValue">{course.rating || 0}</span> (
-              <span itemProp="ratingCount">{course.studentsEnrolled}</span> students)
+              <span itemProp="ratingCount">{course.studentsEnrolled}</span>{" "}
+              students)
             </span>
           </div>
         </div>
@@ -243,11 +274,18 @@ export function CourseEnrollmentSidebar({
           disabled={enrolling || course.isEnrolled}
           aria-disabled={enrolling || course.isEnrolled}
         >
-          {course.isEnrolled ? "Already Enrolled" : enrolling ? "Enrolling..." : "Enroll Now"}
+          {course.isEnrolled
+            ? "Already Enrolled"
+            : enrolling
+            ? "Enrolling..."
+            : "Enroll Now"}
         </Button>
 
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm mb-6">
-          <h3 className="font-medium dark:text-white mb-4">What You'll Learn</h3>
+          <h3 className="font-medium dark:text-white mb-4">
+            What You&apos;ll Learn
+          </h3>
+
           <ul className="space-y-3">
             {course.skills.map((skill, index) => (
               <li key={index} className="flex items-start">
@@ -258,7 +296,12 @@ export function CourseEnrollmentSidebar({
                   stroke="currentColor"
                   aria-hidden="true"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 <span className="dark:text-gray-300" itemProp="teaches">
                   {skill}
@@ -272,8 +315,16 @@ export function CourseEnrollmentSidebar({
           <h3 className="font-medium dark:text-white mb-4">Course Content</h3>
           <div className="space-y-4">
             {course.content.slice(0, 3).map((chapter) => (
-              <div key={chapter.id} itemProp="hasPart" itemScope itemType="https://schema.org/CreativeWork">
-                <h4 className="text-sm font-semibold dark:text-gray-300 mb-2" itemProp="name">
+              <div
+                key={chapter.id}
+                itemProp="hasPart"
+                itemScope
+                itemType="https://schema.org/CreativeWork"
+              >
+                <h4
+                  className="text-sm font-semibold dark:text-gray-300 mb-2"
+                  itemProp="name"
+                >
                   {chapter.title}
                 </h4>
                 <Progress
@@ -284,13 +335,15 @@ export function CourseEnrollmentSidebar({
               </div>
             ))}
             {course.totalChapters > 3 && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">+ {course.totalChapters - 3} more chapters</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                + {course.totalChapters - 3} more chapters
+              </p>
             )}
           </div>
         </div>
       </div>
     </aside>
-  )
+  );
 }
 
 // Course Structured Data Component
@@ -321,9 +374,12 @@ export function CourseStructuredData({ course }: { course: Course }) {
       ratingValue: course.rating,
       ratingCount: course.studentsEnrolled,
     },
-  }
+  };
 
   return (
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(courseStructuredData) }} />
-  )
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(courseStructuredData) }}
+    />
+  );
 }

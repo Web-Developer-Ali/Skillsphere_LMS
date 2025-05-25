@@ -8,7 +8,7 @@ type MobileNavButtonProps = {
   isActive: boolean;
 };
 
-export const MobileNavButton = ({ view, icon, label, onClick, isActive }: MobileNavButtonProps) => (
+export const MobileNavButton = ({ icon, label, onClick, isActive }: MobileNavButtonProps) => (
   <button
     onClick={onClick}
     className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors ${

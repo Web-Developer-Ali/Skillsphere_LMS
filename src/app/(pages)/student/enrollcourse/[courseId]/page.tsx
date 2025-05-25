@@ -44,7 +44,7 @@ export default function CourseEnrollmentPage({ params }: { params: { courseId: s
   const handleEnroll =() => {
     if (!course) return
     setEnrolling(true)
-    router.replace(`/payment-gateway?courseId=${course.id}`)
+    router.replace(`/payment-gateway/${course.id}`)
     setEnrolling(false)
   }
 

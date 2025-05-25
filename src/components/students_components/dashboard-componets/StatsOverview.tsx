@@ -1,8 +1,14 @@
-import { BookOpen, Clock, Trophy, Award } from "lucide-react";
+import { BookOpen, Clock, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+interface UserInfo {
+  enrolledCourseCount?: number;
+  totalLearningHours?: number;
+  certificationCount?: number;
+}
+
 interface StatsOverviewProps {
-  userInfo: any;
+  userInfo: UserInfo;
 }
 
 export default function StatsOverview({ userInfo }: StatsOverviewProps) {

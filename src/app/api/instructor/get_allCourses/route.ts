@@ -43,14 +43,19 @@ export async function GET() {
     const courses = result.rows;
 
     return NextResponse.json(courses);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching courses:", error);
+  
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+  
     return NextResponse.json(
-      { 
+      {
         message: "Error fetching courses",
-        error: error.message 
+        error: message,
       },
       { status: 500 }
     );
   }
+  
 }

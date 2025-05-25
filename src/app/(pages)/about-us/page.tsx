@@ -9,7 +9,7 @@ import Prof_Michael_Chen from "../../../../public/Prof_Michael_Chen.jpg";
 import lnc42u from "../../../../public/lnc42u.jpg";
 const About = () => {
   const [activeTab, setActiveTab] = useState('features');
-  const { data: session, status } = useSession()
+  const { data: session } = useSession()
   const router = useRouter();
 const isStudent = session?.user?.role == "Student";
 const browsing = ()=>{

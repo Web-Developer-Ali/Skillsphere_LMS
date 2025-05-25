@@ -81,6 +81,14 @@ export async function DELETE(request: NextRequest) {
       Number(courseId)
     ]);
 
+    if (checkEnrollmentsResult.rows.length > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete course with enrolled students." },
+        { status: 400 }
+      );
+    }
+    
+
     // Delete thumbnail if exists
     if (ThumbnailPublicID) {
       try {
@@ -136,14 +144,17 @@ export async function DELETE(request: NextRequest) {
     } finally {
       client.release();
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
     console.error("Error deleting course:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Failed to delete course",
-        details: error.message 
+        details: message
       },
       { status: 500 }
     );
   }
+  
 }

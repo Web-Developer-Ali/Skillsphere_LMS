@@ -57,13 +57,11 @@ export default function HLSPlayer({
   const [error, setError] = useState<string | null>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showPlayOverlay, setShowPlayOverlay] = useState(autoPlay);
-  const [userInteracted, setUserInteracted] = useState(false);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Listen for user interaction
   useEffect(() => {
     const handleUserInteraction = () => {
-      setUserInteracted(true);
       document.removeEventListener('click', handleUserInteraction);
       document.removeEventListener('touchstart', handleUserInteraction);
     };
@@ -78,139 +76,139 @@ export default function HLSPlayer({
   }, []);
 
   // Initialize HLS
-  useEffect(() => {
-    let hls: Hls | null = null;
+// Initialize HLS
+useEffect(() => {
+  let hls: Hls | null = null;
+  const video = videoRef.current; // Copy the ref to a local variable
 
-    const initPlayer = async () => {
-      if (!videoRef.current) return;
+  const initPlayer = async () => {
+    if (!video) return;
 
-      try {
-        setIsLoading(true);
-        setError(null);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-        // Fetch and modify the master playlist
-        const response = await fetch(src);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch video: ${response.status}`);
+      // Fetch and modify the master playlist
+      const response = await fetch(src);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video: ${response.status}`);
+      }
+
+      const masterPlaylist = await response.text();
+      // Extract the base URL from the video URL
+      const containerBaseUrl =
+        src.match(/(.*\/chaperters-videos-transcoded\/)/)?.[0] ||
+        src.substring(0, src.lastIndexOf("/") + 1);
+
+      // Modify the playlist to ensure all paths are absolute
+      const lines = masterPlaylist.split("\n");
+      const modifiedLines = lines.map((line) => {
+        if (
+          !line.startsWith("#") &&
+          (line.includes(".m3u8") || line.includes(".ts"))
+        ) {
+          // If the line is not already an absolute URL, prepend the base URL
+          if (!line.startsWith("http")) {
+            return containerBaseUrl + line;
+          }
         }
+        return line;
+      });
 
-        const masterPlaylist = await response.text();
-        // Extract the base URL from the video URL
-        const containerBaseUrl =
-          src.match(/(.*\/chaperters-videos-transcoded\/)/)?.[0] ||
-          src.substring(0, src.lastIndexOf("/") + 1);
+      const modifiedPlaylist = modifiedLines.join("\n");
+      const blob = new Blob([modifiedPlaylist], {
+        type: "application/x-mpegURL",
+      });
+      const modifiedPlaylistUrl = URL.createObjectURL(blob);
 
-        // Modify the playlist to ensure all paths are absolute
-        const lines = masterPlaylist.split("\n");
-        const modifiedLines = lines.map((line) => {
-          if (
-            !line.startsWith("#") &&
-            (line.includes(".m3u8") || line.includes(".ts"))
-          ) {
-            // If the line is not already an absolute URL, prepend the base URL
-            if (!line.startsWith("http")) {
-              return containerBaseUrl + line;
+      if (Hls.isSupported()) {
+        hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+        });
+
+        hls.loadSource(modifiedPlaylistUrl);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setIsLoading(false);
+          if (autoPlay) {
+            // Mute the video if mutedAutoPlay is true
+            if (mutedAutoPlay) {
+              video.muted = true;
+              setIsMuted(true);
+            }
+            
+            video.play().catch((err) => {
+              console.error("Autoplay failed:", err);
+              setShowPlayOverlay(true);
+              setIsPlaying(false);
+            });
+            setIsPlaying(true);
+            setShowPlayOverlay(false);
+          }
+        });
+
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.error("Network error, trying to recover...");
+                hls?.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.error("Media error, trying to recover...");
+                hls?.recoverMediaError();
+                break;
+              default:
+                console.error("Unrecoverable error:", data);
+                hls?.destroy();
+                setError("Failed to load video stream");
+                break;
             }
           }
-          return line;
         });
-
-        const modifiedPlaylist = modifiedLines.join("\n");
-        const blob = new Blob([modifiedPlaylist], {
-          type: "application/x-mpegURL",
+      } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+        // Native HLS support (Safari)
+        video.src = modifiedPlaylistUrl;
+        video.addEventListener("loadedmetadata", () => {
+          setIsLoading(false);
+          if (autoPlay) {
+            if (mutedAutoPlay) {
+              video.muted = true;
+              setIsMuted(true);
+            }
+            video.play().catch((err) => {
+              console.error("Autoplay failed:", err);
+              setShowPlayOverlay(true);
+              setIsPlaying(false);
+            });
+            setIsPlaying(true);
+            setShowPlayOverlay(false);
+          }
         });
-        const modifiedPlaylistUrl = URL.createObjectURL(blob);
-
-        if (Hls.isSupported()) {
-          hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: true,
-          });
-
-          hls.loadSource(modifiedPlaylistUrl);
-          hls.attachMedia(videoRef.current);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            setIsLoading(false);
-            if (autoPlay) {
-              // Mute the video if mutedAutoPlay is true
-              if (mutedAutoPlay) {
-                videoRef.current!.muted = true;
-                setIsMuted(true);
-              }
-              
-              videoRef.current?.play().catch((err) => {
-                console.error("Autoplay failed:", err);
-                setShowPlayOverlay(true);
-                setIsPlaying(false);
-              });
-              setIsPlaying(true);
-              setShowPlayOverlay(false);
-            }
-          });
-
-          hls.on(Hls.Events.ERROR, (_, data) => {
-            if (data.fatal) {
-              switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.error("Network error, trying to recover...");
-                  hls?.startLoad();
-                  break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.error("Media error, trying to recover...");
-                  hls?.recoverMediaError();
-                  break;
-                default:
-                  console.error("Unrecoverable error:", data);
-                  hls?.destroy();
-                  setError("Failed to load video stream");
-                  break;
-              }
-            }
-          });
-        } else if (
-          videoRef.current.canPlayType("application/vnd.apple.mpegurl")
-        ) {
-          // Native HLS support (Safari)
-          videoRef.current.src = modifiedPlaylistUrl;
-          videoRef.current.addEventListener("loadedmetadata", () => {
-            setIsLoading(false);
-            if (autoPlay) {
-              if (mutedAutoPlay) {
-                videoRef.current!.muted = true;
-                setIsMuted(true);
-              }
-              videoRef.current?.play().catch((err) => {
-                console.error("Autoplay failed:", err);
-                setShowPlayOverlay(true);
-                setIsPlaying(false);
-              });
-              setIsPlaying(true);
-              setShowPlayOverlay(false);
-            }
-          });
-        } else {
-          setError("HLS is not supported in this browser");
-        }
-      } catch (err) {
-        console.error("Error initializing player:", err);
-        setError(err instanceof Error ? err.message : "Failed to load video");
-        setIsLoading(false);
+      } else {
+        setError("HLS is not supported in this browser");
       }
-    };
+    } catch (err) {
+      console.error("Error initializing player:", err);
+      setError(err instanceof Error ? err.message : "Failed to load video");
+      setIsLoading(false);
+    }
+  };
 
-    initPlayer();
+  initPlayer();
 
-    return () => {
-      if (hls) {
-        hls.destroy();
-      }
-      // Clean up object URLs to avoid memory leaks
-      if (videoRef.current?.src && videoRef.current.src.startsWith("blob:")) {
-        URL.revokeObjectURL(videoRef.current.src);
-      }
-    };
-  }, [src, autoPlay, mutedAutoPlay]);
+  return () => {
+    if (hls) {
+      hls.destroy();
+    }
+    // Clean up object URLs to avoid memory leaks
+    if (video?.src && video.src.startsWith("blob:")) {
+      URL.revokeObjectURL(video.src);
+    }
+  };
+}, [src, autoPlay, mutedAutoPlay]);
 
   // Handle time updates
   useEffect(() => {

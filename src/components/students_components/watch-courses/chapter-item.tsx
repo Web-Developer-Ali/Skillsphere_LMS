@@ -5,6 +5,7 @@ import { PlayCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import axios from "axios"
 import { ChapterItemProps } from "@/types/watch-courses-api"
+import Image from "next/image"
 
 const formatDuration = (duration: number): string => {
   if (!duration || isNaN(duration)) return "0:00"
@@ -91,13 +92,13 @@ const ChapterItem = memo(({
         <div className="relative mr-3 flex-shrink-0">
           <div className="w-24 h-14 rounded-md overflow-hidden relative">
             {thumbnailUrl && !error ? (
-              <img
-                src={thumbnailUrl}
-                alt={`Thumbnail for ${chapter.title}`}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={handleImageError}
-              />
+              <Image
+              src={thumbnailUrl}
+              alt={`Thumbnail for ${chapter.title}`}
+              fill
+              className="object-cover"
+              onError={handleImageError}
+            />
             ) : (
               <ThumbnailPlaceholder />
             )}

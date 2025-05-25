@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import connectToDatabase from "@/lib/dbConnect";
 import { redis } from "@/lib/redis";
 import { NextResponse } from "next/server";
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
       WHERE c."Status" = 'published'
     `;
 
-    const queryParams: any[] = [];
+    const queryParams: (string | number)[] = [];
 
     if (category && category !== "All") {
       query += ` AND c."Category" = $${queryParams.length + 1}`;
@@ -102,7 +104,7 @@ export async function GET(request: Request) {
     }
 
     let countQuery = `SELECT COUNT(*) AS "TotalCount" FROM "Courses" c WHERE c."Status" = 'published'`;
-    const countParams: any[] = [];
+    const countParams: (string | number)[] = [];
 
     if (category && category !== "All") {
       countQuery += ` AND c."Category" = $${countParams.length + 1}`;
@@ -162,10 +164,13 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching courses:", error);
+  
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+  
     return NextResponse.json(
-      { error: "Failed to fetch courses", details: error.message },
+      { error: "Failed to fetch courses", details: errorMessage },
       { status: 500 }
     );
   }

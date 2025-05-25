@@ -5,12 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import HLSPlayer from "@/components/students_components/watch-courses/video-player";
 import {
   CoursePlayerContentProps,
-  Video,
   VideoDetailsProps,
 } from "@/types/watch-courses-api";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 function CourseRating({
   currentRating,
@@ -216,8 +215,9 @@ function VideoDetails({
           </div>
           <div>
             <p className="font-medium text-green-800 dark:text-green-300">
-              You've completed this video!
+              You&apos;ve completed this video!
             </p>
+
             {chapters.length > 1 &&
               chapters[chapters.length - 1].chapterId !== video.chapterId && (
                 <p className="text-sm text-green-700 dark:text-green-400">

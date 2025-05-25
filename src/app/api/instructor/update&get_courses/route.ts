@@ -169,10 +169,11 @@ export async function PUT(req: NextRequest) {
       );
     }
 
+
     // Dynamically build update query for Courses table
     let query = 'UPDATE "Courses" SET ';
     const updateClauses: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean | null)[] = [];
     let paramIndex = 1;
 
     Object.entries(updates).forEach(([key, value]) => {
@@ -183,6 +184,7 @@ export async function PUT(req: NextRequest) {
 
     query += updateClauses.join(", ") + ' WHERE "CourseID" = $' + paramIndex;
     values.push(Number(id));
+
 
     await pool.query(query, values);
 

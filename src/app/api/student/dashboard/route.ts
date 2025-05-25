@@ -1,9 +1,12 @@
+export const dynamic = 'force-dynamic';
+
 import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { redis } from "@/lib/redis";
 import { DashboardResponse } from "@/types/dashboard";
+import { Pool } from 'pg';
 
 // Constants
 const CACHE_TTL = 60 * 30; // 30 minutes cache TTL
@@ -93,16 +96,16 @@ const QUERIES = {
 };
 
 // Enhanced cache validation
-function isValidDashboardResponse(data: any): data is DashboardResponse {
+function isValidDashboardResponse(data: unknown): data is DashboardResponse {
   if (!data || typeof data !== 'object') return false;
 
   return (
-    typeof data.enrolledCourseCount === 'number' &&
-    typeof data.totalLearningHours === 'number' &&
-    typeof data.certificationCount === 'number' &&
-    Array.isArray(data.recentEnrolledCourses) &&
-    (!data.recommendedCourses || Array.isArray(data.recommendedCourses)) &&
-    (!data.recommendationsBasedOn || typeof data.recommendationsBasedOn === 'string')
+    typeof (data as DashboardResponse).enrolledCourseCount === 'number' &&
+    typeof (data as DashboardResponse).totalLearningHours === 'number' &&
+    typeof (data as DashboardResponse).certificationCount === 'number' &&
+    Array.isArray((data as DashboardResponse).recentEnrolledCourses) &&
+    (!(data as DashboardResponse).recommendedCourses || Array.isArray((data as DashboardResponse).recommendedCourses)) &&
+    (!(data as DashboardResponse).recommendationsBasedOn || typeof (data as DashboardResponse).recommendationsBasedOn === 'string')
   );
 }
 
@@ -235,7 +238,7 @@ export async function GET() {
 }
 
 async function getRecommendations(
-  pool: any,
+  pool: Pool,
   desireRole: string | undefined,
   enrolledCourseIds: number[]
 ): Promise<Pick<DashboardResponse, "recommendedCourses" | "recommendationsBasedOn">> {
@@ -243,7 +246,7 @@ async function getRecommendations(
 
   try {
     const hasEnrolledCourses = enrolledCourseIds.length > 0;
-    const params: any[] = [`%${desireRole}%`];
+    const params: (string | number | number[])[] = [`%${desireRole}%`];
     if (hasEnrolledCourses) params.push(enrolledCourseIds);
 
     const recommendationsResult = await pool.query(

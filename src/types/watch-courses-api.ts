@@ -20,6 +20,48 @@ export interface Course {
   isEnrolled: boolean
 }
 
+export type CourseResponse = {
+  courseId: number;
+  title: string;
+  instructorName: string;
+  isEnrolled: boolean;
+  completionStatus: boolean;
+  chapters?: {
+    chapterId: number;
+    title: string;
+    description: string;
+    thumbnailUrl: string;
+    duration: string;
+    videoUrl: string | null;
+    isFreePreview: boolean;
+    chapterNumber: number;
+    isReady: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }[];
+};
+
+export type ErrorResponse = {
+  error: string;
+  message: string;
+};
+
+
+export type ChapterRow = {
+  chapterId: number;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  duration: string;
+  videoUrl: string | null;
+  isFreePreview: boolean;
+  chapterNumber: number;
+  transcodingStatus: string;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+};
+
+
 export interface CoursePlayerProps {
   courseId: string | null
 }
@@ -34,7 +76,7 @@ export interface CoursePlayerHeaderProps {
 }
 
 export interface CoursePlayerContentProps {
-  courseId:Number
+  courseId:number
   currentVideo: Video | null
   instructorName: string
   chapters: Video[]
@@ -66,5 +108,5 @@ export interface VideoDetailsProps {
   instructorName: string
   chapters: Video[]
   onRateCourse: (rating: number) => Promise<void>
-  courseId: Number
+  courseId: number
 }

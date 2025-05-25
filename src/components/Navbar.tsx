@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, User, Bell, GraduationCap, MessageSquare } from "lucide-react";
+import { Menu, User, Bell, GraduationCap } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";

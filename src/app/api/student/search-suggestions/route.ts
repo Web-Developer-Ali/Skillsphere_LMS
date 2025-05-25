@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { redis } from "@/lib/redis";
+import { SearchResponseData } from "@/types/serch-suggestions";
 
 // Cache configuration
 const CACHE_TTL = 60 * 5; // 5 minutes
@@ -111,7 +112,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function cacheResponse(cacheKey: string, data: any) {
+async function cacheResponse(cacheKey: string, data: SearchResponseData) {
   try {
     await redis.set(cacheKey, JSON.stringify(data), { ex: CACHE_TTL });
   } catch (error) {

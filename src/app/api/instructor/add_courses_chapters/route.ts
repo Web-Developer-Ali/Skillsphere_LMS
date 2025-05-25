@@ -42,13 +42,13 @@ export async function PUT(request: Request) {
       );
     }
 
-      // Validate duration
-      if (!duration || isNaN(Number(duration))) {
-        return NextResponse.json(
-          { error: "Valid duration is required" },
-          { status: 400 }
-        );
-      }
+    // Validate duration
+    if (!duration || isNaN(Number(duration))) {
+      return NextResponse.json(
+        { error: "Valid duration is required" },
+        { status: 400 }
+      );
+    }
 
     // Convert the video file to a Buffer
     const arrayBuffer = await videoFile.arrayBuffer();
@@ -89,7 +89,7 @@ export async function PUT(request: Request) {
 
         const maxChapterCount = chapterCountResult.rows[0]?.maxChapterCount || 0;
         const newChapterCount = maxChapterCount + 1;
-const Thumbnail = thumbnailUrl
+        const Thumbnail = thumbnailUrl
         // Insert the new chapter into the Courses_Chapters table
         const insertQuery = `
           INSERT INTO "Courses_Chapters" (
@@ -128,7 +128,7 @@ const Thumbnail = thumbnailUrl
         await client.query('COMMIT');
 
         return NextResponse.json(
-          { 
+          {
             message: "Chapter and video uploaded successfully",
             chapterId: chapterId
           },
@@ -140,23 +140,37 @@ const Thumbnail = thumbnailUrl
         await client.query('ROLLBACK');
         throw error;
       }
-    } catch (error: any) {
-      console.error("Transaction error:", error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error("Transaction error:", error);
+        return NextResponse.json(
+          { error: "Failed to create chapter and upload video", details: error.message },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
-        { error: "Failed to create chapter and upload video", details: error.message },
+        { error: "Failed to create chapter and upload video", details: "Unknown error" },
         { status: 500 }
       );
-    } finally {
+    }
+    finally {
       client.release();
     }
 
-  } catch (error: any) {
-    console.error("Error adding chapter:", error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error adding chapter:", error);
+      return NextResponse.json(
+        { error: "Internal Server Error", details: error.message },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error", details: "Unknown error" },
       { status: 500 }
     );
   }
+
 }
 
 export async function GET(req: NextRequest) {
@@ -192,15 +206,22 @@ export async function GET(req: NextRequest) {
     }
 
     const { TranscodingStatus, TranscodingError } = result.rows[0];
-    return NextResponse.json({ 
-      TranscodingStatus, 
-      TranscodingError 
+    return NextResponse.json({
+      TranscodingStatus,
+      TranscodingError
     });
-  } catch (error: any) {
-    console.error('Error fetching transcoding status:', error);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error('Error fetching transcoding status:', error);
+      return NextResponse.json(
+        { message: 'Internal server error', details: error.message },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
-      { message: 'Internal server error', details: error.message },
+      { message: 'Internal server error', details: 'Unknown error' },
       { status: 500 }
     );
   }
+
 }

@@ -187,7 +187,7 @@ function CourseChapterForm() {
   const handleVideoChange = (file: File | null) => {
     if (!file) {
       setVideoPreview(null)
-      form.setValue("video", null as any)
+      form.setValue("video", null as unknown as File)
       form.setValue("duration", undefined)
       form.setValue("thumbnail", undefined)
       return
@@ -212,7 +212,7 @@ function CourseChapterForm() {
         })
         URL.revokeObjectURL(videoUrl)
         setVideoPreview(null)
-        form.setValue("video", null as any)
+        form.setValue("video", null as unknown as File)
         form.setValue("duration", undefined)
         form.setValue("thumbnail", undefined)
       } else {
@@ -220,7 +220,7 @@ function CourseChapterForm() {
         form.setValue("duration", duration)
 
         // Generate thumbnail
-        generateThumbnail(video, videoUrl)
+        generateThumbnail(video)
           .then((thumbnail) => {
             form.setValue("thumbnail", thumbnail)
             setVideoPreview(videoUrl)
@@ -247,13 +247,13 @@ function CourseChapterForm() {
       })
       URL.revokeObjectURL(videoUrl)
       setVideoPreview(null)
-      form.setValue("video", null as any)
+      form.setValue("video", null as unknown as File)
       form.setValue("duration", undefined)
       form.setValue("thumbnail", undefined)
     }
   }
 
-  const generateThumbnail = (video: HTMLVideoElement, videoUrl: string): Promise<Blob> => {
+  const generateThumbnail = (video: HTMLVideoElement): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       try {
         // Seek to 25% of the video duration for the thumbnail

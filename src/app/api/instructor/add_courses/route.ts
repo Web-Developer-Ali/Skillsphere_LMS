@@ -97,16 +97,17 @@ export async function POST(req: Request) {
     const result = await pool.query(insertQuery, values);
 
     return NextResponse.json(
-      { 
+      {
         message: "Course created successfully",
-        courseId: result.rows[0].CourseID 
+        courseId: result.rows[0].CourseID
       },
       { status: 201 }
     );
-  } catch (error: any) {
-    console.error("Error creating course:", error);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.error("Error creating course:", err);
     return NextResponse.json(
-      { message: "Error creating course", error: error.message },
+      { message: "Error creating course", error: err.message },
       { status: 500 }
     );
   }

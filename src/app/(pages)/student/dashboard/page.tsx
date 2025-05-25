@@ -139,7 +139,7 @@ export default function StudentDashboard() {
             Welcome back, {user?.user?.name || "Guest"}!
           </h1>
           <div className="px-4 md:px-6 pt-2">
-            <StatsOverview userInfo={userInfo} />
+          {userInfo && <StatsOverview userInfo={userInfo} />}
 
             <CoursesSection
               title="Continue Learning"

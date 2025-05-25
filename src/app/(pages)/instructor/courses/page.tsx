@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import axios from "axios"
 import CourseCard from "@/components/CourseCard"
-import { Loader2, Plus, RefreshCw, Search, SlidersHorizontal, BookOpen, Users, Star, Layout } from "lucide-react"
+import { Loader2, Plus, RefreshCw, Search, SlidersHorizontal, BookOpen, Users, Layout } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"

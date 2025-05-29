@@ -2,13 +2,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/dbConnect';
 import { redis } from '@/lib/redis';
+import { headers } from 'next/headers';
+import { ratelimit } from '@/lib/rateLimiter';
 
 export async function GET(request: NextRequest) {
   const pool = await connectToDatabase();
-  
+
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const courseId = request.nextUrl.searchParams.get('courseId');
-    
+
     if (!courseId) {
       return NextResponse.json(
         { error: 'Course ID is required' },
@@ -28,7 +46,7 @@ export async function GET(request: NextRequest) {
       'SELECT "Fees", "Students" FROM "Courses" WHERE "CourseID" = $1',
       [parsedCourseId]
     );
-    
+
     if (result.rows.length === 0) {
       return NextResponse.json(
         { error: 'Course not found' },
@@ -38,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     const price = parseFloat(result.rows[0].Fees);
     let enrolledCount = 0;
-    
+
     // Handle both string and number formats for Students field
     const studentsData = result.rows[0].Students;
     if (typeof studentsData === 'number') {
@@ -48,13 +66,13 @@ export async function GET(request: NextRequest) {
       enrolledCount = parseInt(studentsData) || 0;
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       price,
       courseId: parsedCourseId,
       enrolledStudents: enrolledCount
     });
-    
+
   } catch (error) {
     console.error('Error fetching course price:', error);
     return NextResponse.json(
@@ -66,8 +84,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const pool = await connectToDatabase();
-  
+
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const { userId, courseId } = await request.json();
 
     // Validate input
@@ -80,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const parsedUserId = parseInt(userId.toString());
     const parsedCourseId = parseInt(courseId.toString());
-    
+
     if (isNaN(parsedUserId) || isNaN(parsedCourseId)) {
       return NextResponse.json(
         { error: 'Invalid user ID or course ID format' },

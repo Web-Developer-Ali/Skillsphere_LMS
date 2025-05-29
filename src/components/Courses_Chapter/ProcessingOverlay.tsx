@@ -5,9 +5,15 @@ interface ProcessingOverlayProps {
   isProcessing: boolean
   isPolling: boolean
   statusMessages: string[]
+  uploadProgress: number
 }
 
-export const ProcessingOverlay = ({ isProcessing, isPolling, statusMessages }: ProcessingOverlayProps) => {
+export const ProcessingOverlay = ({ 
+  isProcessing, 
+  isPolling, 
+  statusMessages, 
+  uploadProgress 
+}: ProcessingOverlayProps) => {
   if (!isProcessing) return null
 
   return (
@@ -20,10 +26,30 @@ export const ProcessingOverlay = ({ isProcessing, isPolling, statusMessages }: P
             This task may take 10 to 15 minutes to complete. Please wait...
           </p>
 
-          {/* Dynamic status message */}
-          <p className="text-sm dark:text-gray-300">
-            {statusMessages[statusMessages.length - 1]}
-          </p>
+          {/* Upload progress bar - only shown during upload (0 < progress < 100) */}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm dark:text-gray-300">
+                <span>Uploading video...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* Dynamic status messages */}
+          <div className="space-y-1">
+            {statusMessages.map((message, index) => (
+              <p key={index} className="text-sm dark:text-gray-300">
+                {message}
+              </p>
+            ))}
+          </div>
 
           {/* Loading spinner and message */}
           {isPolling && (

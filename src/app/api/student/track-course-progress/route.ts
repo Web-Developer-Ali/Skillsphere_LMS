@@ -2,9 +2,27 @@ import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 export async function POST(req: Request) {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
 
@@ -14,7 +32,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { courseId, chapterId } = body;
-    
+
     if (!courseId || !chapterId) {
       return new NextResponse("Missing required fields", { status: 400 });
     }
@@ -49,7 +67,7 @@ export async function POST(req: Request) {
       const totalChapters = parseInt(chapterData.totalChapters, 10) || 0;
       const completedCount = parseInt(chapterData.completedCount, 10) || 0;
       const currentMinutes = parseInt(chapterData.currentMinutes, 10) || 0;
-        // 2. Mark chapter as completed
+      // 2. Mark chapter as completed
       await client.query(
         `INSERT INTO "CourseProgress" ("UserID", "CourseID", "ChapterID", "IsCompleted", "LastAccessed")
          VALUES ($1, $2, $3, TRUE, NOW())
@@ -76,13 +94,13 @@ export async function POST(req: Request) {
       // Convert to hours for response (optional)
       const durationHours = (newTotalMinutes / 60).toFixed(1);
 
-      return NextResponse.json({ 
-        message: "Progress updated", 
-        completedChapters: newCompletedCount, 
+      return NextResponse.json({
+        message: "Progress updated",
+        completedChapters: newCompletedCount,
         totalChapters,
         durationMinutes: newTotalMinutes,
         durationHours, // Optional: for display purposes
-        isComplete 
+        isComplete
       });
     } catch (error) {
       await client.query('ROLLBACK');

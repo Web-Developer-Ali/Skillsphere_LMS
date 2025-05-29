@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import axios from 'axios'
 
 interface CourseFormHeaderProps {
   courseStatus: string
@@ -42,9 +43,11 @@ export default function CourseFormHeader({ courseStatus, updateCourseField, onDe
     } catch (error) {
       console.error('Error deleting course:', error)
       toast({
-        title: 'Error',
-        description: 'Failed to delete the course. Please try again.',
-        variant: 'destructive',
+        title: "Fail to deleteing Course.",
+        description: axios.isAxiosError(error)
+          ? error.response?.data.error || "Something went wrong!"
+          : "An unexpected error occurred",
+        variant: "destructive",
       })
     } finally {
       setIsDeleteDialogOpen(false)

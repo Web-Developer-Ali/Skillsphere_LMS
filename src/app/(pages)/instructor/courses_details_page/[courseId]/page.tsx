@@ -132,15 +132,17 @@ export default function CourseForm() {
         // Redirect to the courses list page after deletion
         router.push("/instructor/courses");
       } else {
-        throw new Error("Failed to delete course");
+        throw new Error(response.data.error);
       }
-    } catch (error) {
-      console.error("Error deleting course:", error);
+    }  catch (error) {
       toast({
-        title: "Error",
-        description: "Failed to delete the course. Please try again.",
+        title: "Fail to Submitting Ratings",
+        description: axios.isAxiosError(error)
+          ? error.response?.data.message || "Something went wrong!"
+          : "An unexpected error occurred",
         variant: "destructive",
       });
+      throw error;
     } finally {
       setIsUpdating(false);
     }

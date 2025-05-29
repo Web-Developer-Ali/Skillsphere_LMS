@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import connectToDatabase from "@/lib/dbConnect";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,22 @@ type Enrollment = {
 
 export async function GET() {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     // Get session data
     const session = await getServerSession(authOptions);
     // Check if the user is authenticated and has the role of 'Instructor'

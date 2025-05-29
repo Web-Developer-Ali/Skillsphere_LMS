@@ -4,55 +4,49 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import connectToDatabase from "@/lib/dbConnect";
 import { uploadToAzure } from "@/lib/azure-blob-storage";
 import { v4 as uuidv4 } from "uuid";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
+
 export async function PUT(request: Request) {
   try {
-    // Authenticate the user
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const session = await getServerSession(authOptions);
 
     if (!session || !session.user || session.user.role !== "Instructor") {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse the form data
     const formData = await request.formData();
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
     const courseId = formData.get("courseId") as string;
     const isFreePreview = formData.get("isFreePreview") === "true";
-    const videoFile = formData.get("video") as File | null;
+    const blobUrl = formData.get("videoUrl") as string | null;
     const duration = formData.get("duration") as string | null;
     const thumbnailFile = formData.get("thumbnail") as File | null;
 
-    // Validate required fields
-    if (!title || !description || !courseId || isNaN(Number(courseId))) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    if (!title || !description || !courseId || isNaN(Number(courseId)) || !blobUrl) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate video file
-    if (!videoFile || videoFile.size === 0) {
-      return NextResponse.json(
-        { error: "Video file is required" },
-        { status: 400 }
-      );
-    }
-
-    // Validate duration
     if (!duration || isNaN(Number(duration))) {
-      return NextResponse.json(
-        { error: "Valid duration is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Valid duration is required" }, { status: 400 });
     }
-
-    // Convert the video file to a Buffer
-    const arrayBuffer = await videoFile.arrayBuffer();
-    const videoBuffer = Buffer.from(arrayBuffer);
 
     let thumbnailUrl = null;
     if (thumbnailFile) {
@@ -63,116 +57,77 @@ export async function PUT(request: Request) {
 
         thumbnailUrl = await uploadToAzure(fileBuffer, uniqueFilename, false);
       } catch (uploadError) {
-        console.error("Error uploading to Azure Blob Storage:", uploadError);
-        return NextResponse.json(
-          { message: "Error uploading thumbnail" },
-          { status: 500 }
-        );
+        console.error("Error uploading thumbnail:", uploadError);
+        return NextResponse.json({ message: "Error uploading thumbnail" }, { status: 500 });
       }
     }
 
-    // Connect to the database
     const pool = await connectToDatabase();
     const client = await pool.connect();
 
     try {
-      // Start a transaction
-      await client.query('BEGIN');
+      await client.query("BEGIN");
 
-      try {
-        // Fetch the current maximum ChapterCount for the given CourseID
-        const chapterCountResult = await client.query(`
-          SELECT MAX("ChapterCount") AS "maxChapterCount"
-          FROM "Courses_Chapters"
-          WHERE "CourseID" = $1
-        `, [Number(courseId)]);
+      const chapterCountResult = await client.query(
+        `SELECT MAX("ChapterCount") AS "maxChapterCount" FROM "Courses_Chapters" WHERE "CourseID" = $1`,
+        [Number(courseId)]
+      );
+      const maxChapterCount = chapterCountResult.rows[0]?.maxChapterCount || 0;
+      const newChapterCount = maxChapterCount + 1;
 
-        const maxChapterCount = chapterCountResult.rows[0]?.maxChapterCount || 0;
-        const newChapterCount = maxChapterCount + 1;
-        const Thumbnail = thumbnailUrl
-        // Insert the new chapter into the Courses_Chapters table
-        const insertQuery = `
-          INSERT INTO "Courses_Chapters" (
-            "Title", 
-            "Description", 
-            "IsFreePreview", 
-            "CourseID", 
-            "ChapterCount",
-            "Thumbnail",
-            "Duration"
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          RETURNING "ChapterID"
-        `;
+      const insertQuery = `
+        INSERT INTO "Courses_Chapters" (
+          "Title", 
+          "Description", 
+          "IsFreePreview", 
+          "CourseID", 
+          "ChapterCount",
+          "Thumbnail",
+          "Duration",
+          "Video"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING "ChapterID"
+      `;
 
-        const result = await client.query(insertQuery, [
-          title,
-          description,
-          isFreePreview,
-          Number(courseId),
-          newChapterCount,
-          Thumbnail,
-          duration
-        ]);
+      const result = await client.query(insertQuery, [
+        title,
+        description,
+        isFreePreview,
+        Number(courseId),
+        newChapterCount,
+        thumbnailUrl,
+        duration,
+        blobUrl,
+      ]);
 
-        const chapterId = result.rows[0].ChapterID;
+      await client.query("COMMIT");
 
-        // Upload the video to Azure Blob Storage
-        const fileName = `${courseId}_${Date.now()}_${videoFile.name}`;
-        await uploadToAzure(videoBuffer, fileName, true, {
-          chapterId: chapterId.toString(),
-          isFreePreview: isFreePreview.toString(),
-        });
-
-        // If we reach here, both database insert and video upload were successful
-        await client.query('COMMIT');
-
-        return NextResponse.json(
-          {
-            message: "Chapter and video uploaded successfully",
-            chapterId: chapterId
-          },
-          { status: 201 }
-        );
-
-      } catch (error) {
-        // If anything fails, roll back the transaction
-        await client.query('ROLLBACK');
-        throw error;
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error("Transaction error:", error);
-        return NextResponse.json(
-          { error: "Failed to create chapter and upload video", details: error.message },
-          { status: 500 }
-        );
-      }
       return NextResponse.json(
-        { error: "Failed to create chapter and upload video", details: "Unknown error" },
+        { message: "Chapter created successfully", chapterId: result.rows[0].ChapterID },
+        { status: 201 }
+      );
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Transaction error:", error);
+      return NextResponse.json(
+        { error: "Failed to create chapter", details: error },
         { status: 500 }
       );
-    }
-    finally {
+    } finally {
       client.release();
     }
-
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      console.error("Error adding chapter:", error);
-      return NextResponse.json(
-        { error: "Internal Server Error", details: error.message },
-        { status: 500 }
-      );
-    }
+    console.error("Error adding chapter:", error);
     return NextResponse.json(
-      { error: "Internal Server Error", details: "Unknown error" },
+      { error: "Internal Server Error", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
-
 }
 
+
+// get request to check vidro transcoding is complete or not
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const courseId = searchParams.get("courseId");
@@ -186,6 +141,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
     // Connect to the database
     const pool = await connectToDatabase();
 

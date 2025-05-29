@@ -21,10 +21,12 @@ export default function CourseEnrollmentPage({ params }: { params: { courseId: s
     try {
       const response = await axios.get(`/api/student/getcourse_for_enrollement/${params.courseId}`)
       setCourse(response.data)
-      const sasResponse = await axios.get("/api/generate-sas-token", {
-        params: { blobName: response.data.thumbnailUrl },
-      })
-      setThumbnailUrl(sasResponse.data.sasURL)
+     if (response.data.chapterThumbnail) {
+       const sasResponse = await axios.get("/api/generate-sas-token", {
+         params: { blobName: response.data.chapterThumbnail},
+       })
+       setThumbnailUrl(sasResponse.data.sasURL)
+     }
     } catch (error) {
       toast({
         title: "Error",

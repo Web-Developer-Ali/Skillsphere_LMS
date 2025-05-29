@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import connectToDatabase from "@/lib/dbConnect";
 import { deleteBlob } from "@/lib/azure-blob-storage";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 export async function DELETE(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -23,9 +25,25 @@ export async function DELETE(request: NextRequest) {
 
   let pool;
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     pool = await connectToDatabase();
     const userId = parseInt(session.user.id, 10);
-    
+
     if (isNaN(userId)) {
       return NextResponse.json(
         { error: "Invalid instructor ID" },
@@ -87,7 +105,7 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
 
     // Delete thumbnail if exists
     if (ThumbnailPublicID) {
@@ -133,7 +151,7 @@ export async function DELETE(request: NextRequest) {
       }
 
       await client.query('COMMIT');
-      
+
       return NextResponse.json(
         { success: true, message: "Course deleted successfully" },
         { status: 200 }
@@ -156,5 +174,5 @@ export async function DELETE(request: NextRequest) {
       { status: 500 }
     );
   }
-  
+
 }

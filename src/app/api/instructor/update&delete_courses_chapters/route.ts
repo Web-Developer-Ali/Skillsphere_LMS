@@ -3,9 +3,27 @@ import { authOptions } from "../../auth/[...nextauth]/options";
 import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { deleteBlob } from "@/lib/azure-blob-storage";
+import { ratelimit } from "@/lib/rateLimiter";
+import { headers } from "next/headers";
 
 export async function DELETE(req: NextRequest) {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     // Step 1: Check if the user is authenticated
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -45,7 +63,7 @@ export async function DELETE(req: NextRequest) {
     const instructorId = instructorResult.rows[0].InstructorID;
 
     // Step 5: Compare session user ID with the instructor ID
-    if (session.user.id !== instructorId) {
+    if (Number(session.user.id) !== instructorId) {
       return NextResponse.json(
         { success: false, message: "You are not authorized to delete this chapter" },
         { status: 403 }
@@ -73,16 +91,16 @@ export async function DELETE(req: NextRequest) {
     `;
     await pool.query(deleteFilesQuery, [parseInt(chapterId)]);
 
-// Step 9: Delete the chapter thumbnail from blob container
-const checkCourseQuery = `
+    // Step 9: Delete the chapter thumbnail from blob container
+    const checkCourseQuery = `
   SELECT "Thumbnail" 
   FROM "Courses_Chapters"
   WHERE "ChapterID" = $1
 `;
-const checkCourseResult = await pool.query(checkCourseQuery, [chapterId]);
-if (checkCourseResult.rows[0]?.Thumbnail) {
-  await deleteBlob(checkCourseResult.rows[0].Thumbnail, false);
-}
+    const checkCourseResult = await pool.query(checkCourseQuery, [chapterId]);
+    if (checkCourseResult.rows[0]?.Thumbnail) {
+      await deleteBlob(checkCourseResult.rows[0].Thumbnail, false);
+    }
 
     // Step 10: Delete the chapter from the Courses_Chapters table
     const deleteChapterQuery = `
@@ -90,7 +108,7 @@ if (checkCourseResult.rows[0]?.Thumbnail) {
       WHERE "ChapterID" = $1
     `;
     await pool.query(deleteChapterQuery, [parseInt(chapterId)]);
-    
+
     return NextResponse.json(
       { success: true, message: "Chapter, associated files, and blobs deleted successfully" },
       { status: 200 }
@@ -108,6 +126,21 @@ if (checkCourseResult.rows[0]?.Thumbnail) {
 
 export async function PUT(req: NextRequest) {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
     // Step 1: Check authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {

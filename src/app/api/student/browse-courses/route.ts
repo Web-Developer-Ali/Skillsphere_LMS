@@ -1,17 +1,35 @@
 export const dynamic = 'force-dynamic';
 
 import connectToDatabase from "@/lib/dbConnect";
+import { ratelimit } from "@/lib/rateLimiter";
 import { redis } from "@/lib/redis";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parse and validate parameters
     const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const limit = Math.max(1, Number(searchParams.get("limit") || 6));
-    const offset = (page - 1) * limit;
+    const limits = Math.max(1, Number(searchParams.get("limit") || 6));
+    const offset = (page - 1) * limits;
     const rawCategory = searchParams.get("category") || "";
     const category = decodeURIComponent(rawCategory);
     const sort = searchParams.get("sort") || "popular";
@@ -20,7 +38,7 @@ export async function GET(request: Request) {
     const minRating = parseFloat(searchParams.get("minRating") || "");
     const search = searchParams.get("search")?.trim() || "";
 
-    const cacheKey = `courses:${category}:${sort}:${levels}:${maxPrice}:${minRating}:${search}:${page}:${limit}`;
+    const cacheKey = `courses:${category}:${sort}:${levels}:${maxPrice}:${minRating}:${search}:${page}:${limits}`;
 
     // Try to get from Redis cache
     try {
@@ -93,11 +111,11 @@ export async function GET(request: Request) {
       rating: `c."Rating" DESC`,
       popular: `"StudentCount" DESC`,
     };
-    
+
     query += ` ORDER BY ${sortOptions[sort]}`;
     query += ` LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
 
-    const result = await pool.query(query, [...queryParams, limit, offset]);
+    const result = await pool.query(query, [...queryParams, limits, offset]);
 
     if (!result.rows || result.rows.length === 0) {
       return NextResponse.json({ courses: [], totalCount: 0, page, totalPages: 0 });
@@ -130,7 +148,7 @@ export async function GET(request: Request) {
 
     const totalCountResult = await pool.query(countQuery, countParams);
     const totalCount = parseInt(totalCountResult.rows[0]?.TotalCount || "0");
-    const totalPages = Math.ceil(totalCount / limit);
+    const totalPages = Math.ceil(totalCount / limits);
 
     const categoryResult = await pool.query(`
       SELECT "Category"
@@ -166,9 +184,9 @@ export async function GET(request: Request) {
     return NextResponse.json(response);
   } catch (error: unknown) {
     console.error("Error fetching courses:", error);
-  
+
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-  
+
     return NextResponse.json(
       { error: "Failed to fetch courses", details: errorMessage },
       { status: 500 }

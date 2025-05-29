@@ -4,9 +4,26 @@ import { NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 export async function GET(req: Request) {
   try {
+
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
 

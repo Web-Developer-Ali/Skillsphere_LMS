@@ -14,6 +14,7 @@ import { ChapterVideoUpload } from "@/components/Courses_Chapter/ChapterVideoUpl
 import { ChapterAccessSettings } from "@/components/Courses_Chapter/ChapterAccessSettings"
 import { ProcessingOverlay } from "@/components/Courses_Chapter/ProcessingOverlay"
 
+
 // Define schema using Zod
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -27,6 +28,7 @@ const formSchema = z.object({
 function CourseChapterForm() {
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const { toast } = useToast()
   const [isPolling, setIsPolling] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -49,67 +51,78 @@ function CourseChapterForm() {
     if (!courseId) {
       toast({
         title: "Error",
-        description: "Course ID is missing. Please ensure you're on the correct page.",
+        description: "Course ID is missing.",
         variant: "destructive",
-      })
-      return
+      });
+      return;
     }
 
     try {
-      setIsProcessing(true)
-      setStatusMessages(["Starting chapter creation..."])
+      setIsProcessing(true);
+      setStatusMessages(["Starting chapter creation..."]);
 
-      const plainDescription = values.description.replace(/<[^>]*>/g, "")
-      const formData = new FormData()
-      formData.append("title", values.title)
-      formData.append("description", plainDescription)
-      formData.append("courseId", courseId)
-      formData.append("isFreePreview", values.isFreePreview.toString())
-      formData.append("video", values.video)
+      const fileName = `${courseId}_${Date.now()}_${values.video.name}`;
+      const { data: sasData } = await axios.get("/api/generate-sas-token", {
+        params: { blobName: fileName, type: "video" },
+      });
 
-      // Add duration if available
-      if (values.duration !== undefined) {
-        formData.append("duration", values.duration.toString())
-      }
+      const sasUrl = sasData.sasURL;
+      const contentType = sasData.contentType;
+      const arrayBuffer = await values.video.arrayBuffer();
+      const videoBuffer = Buffer.from(arrayBuffer);
 
-      // Add thumbnail if available
-      if (values.thumbnail) {
-        formData.append("thumbnail", values.thumbnail, "thumbnail.jpg")
-      }
+      await axios.put(sasUrl, videoBuffer, {
+        headers: { "x-ms-blob-type": "BlockBlob", "Content-Type": contentType },
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
+          setUploadProgress(percent);
+        },
+      });
 
-      setStatusMessages((prev) => [...prev, "Uploading chapter data..."])
+      setStatusMessages((prev) => [...prev, "Video uploaded successfully. Creating chapter..."]);
 
-      const { data } = await axios.put("/api/instructor/add_courses_chapters", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
+      const plainDescription = values.description.replace(/<[^>]*>/g, "");
+      const formData = new FormData();
+      formData.append("title", values.title);
+      formData.append("description", plainDescription);
+      formData.append("courseId", courseId);
+      formData.append("isFreePreview", values.isFreePreview.toString());
+      formData.append("videoUrl", sasUrl.split("?")[0]);
 
-      const chapterId = data.chapterId
-      setStatusMessages((prev) => [...prev, "Chapter created successfully. Starting video processing..."])
+      if (values.duration !== undefined) formData.append("duration", values.duration.toString());
+      if (values.thumbnail) formData.append("thumbnail", values.thumbnail, "thumbnail.jpg");
+
+      const { data } = await axios.put("/api/instructor/add_courses_chapters", formData);
+      const chapterId = data.chapterId;
+
+      await axios.put(sasUrl, null, {
+        headers: {
+          "x-ms-meta-chapterId": chapterId.toString(),
+          "x-ms-meta-isFreePreview": values.isFreePreview.toString(),
+        },
+        params: { comp: "metadata" },
+      });
+
+      setStatusMessages((prev) => [...prev, "Chapter created. Waiting for video processing..."]);
 
       if (chapterId) {
-        setIsPolling(true)
+        setIsPolling(true);
         pollingIntervalRef.current = setInterval(() => {
-          checkTranscodingStatus(courseId, chapterId)
-        }, 10000)
+          checkTranscodingStatus(courseId, chapterId);
+        }, 10000);
       }
 
-      form.reset()
-      setVideoPreview(null)
-    } catch (error: unknown) {
-      if (axios.isAxiosError(error)) {
-        const errorMessage = error.response?.data?.message || "There was an error creating your chapter."
-        setStatusMessages((prev) => [...prev, `Error: ${errorMessage}`])
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        })
-      } else {
-        console.error("Unexpected error:", error)
-      }
-      setIsProcessing(false)
+      form.reset();
+      setVideoPreview(null);
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Something went wrong during the upload.",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
   const checkTranscodingStatus = useCallback(
     async (courseId: string, chapterId: string) => {
@@ -317,7 +330,7 @@ function CourseChapterForm() {
         </form>
       </Form>
 
-      <ProcessingOverlay isProcessing={isProcessing} isPolling={isPolling} statusMessages={statusMessages} />
+      <ProcessingOverlay uploadProgress={uploadProgress} isProcessing={isProcessing} isPolling={isPolling} statusMessages={statusMessages} />
     </div>
   )
 }

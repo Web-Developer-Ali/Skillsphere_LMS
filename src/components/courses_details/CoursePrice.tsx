@@ -16,7 +16,7 @@ interface CoursePriceProps {
 const priceSchema = z
   .number()
   .min(0, { message: "Price must be at least 0" })
-  .max(99999.99, { message: "Price cannot exceed 99,999.99" }) // Adjust max if needed
+  .max(200, { message: "Price cannot exceed 200" })
   .refine((val) => /^\d+(\.\d{1,2})?$/.test(val.toString()), {
     message: "Price must have at most two decimal places",
   })

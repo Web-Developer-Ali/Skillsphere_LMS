@@ -1,24 +1,16 @@
-const requestCount: Record<string, { count: number; timestamp: number }> = {};
-const RATE_LIMIT = 20; // Max 20 requests per minute
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute in milliseconds
+// lib/rateLimit.ts
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
-// Rate Limiting function
-export const isRateLimited = (ip: string): boolean => {
-  const currentTime = Date.now();
-  const userData = requestCount[ip] || { count: 0, timestamp: currentTime };
+export const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
-  // Reset count if the window has passed
-  if (currentTime - userData.timestamp > RATE_LIMIT_WINDOW) {
-    userData.count = 0;
-    userData.timestamp = currentTime;
-  }
-
-  // Update request count
-  userData.count++;
-
-  // Save the data
-  requestCount[ip] = userData;
-
-  // Check if rate limit is exceeded
-  return userData.count > RATE_LIMIT;
-};
+// Create a new ratelimiter, that allows 8 requests per 10 seconds
+export const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '15 s'),
+  analytics: true,
+  prefix: '@upstash/ratelimit',
+});

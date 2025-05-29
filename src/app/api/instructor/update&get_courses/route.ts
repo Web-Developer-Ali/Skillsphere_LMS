@@ -15,6 +15,22 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const pool = await connectToDatabase();
 
     // Fetch course details
@@ -73,9 +89,27 @@ export async function GET(req: NextRequest) {
 
 import { deleteBlob, uploadToAzure } from "@/lib/azure-blob-storage";
 import { v4 as uuidv4 } from "uuid";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 export async function PUT(req: NextRequest) {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id"); // Course ID
     const session = await getServerSession(authOptions);

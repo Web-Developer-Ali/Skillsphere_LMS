@@ -7,6 +7,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { redis } from "@/lib/redis";
 import { DashboardResponse } from "@/types/dashboard";
 import { Pool } from 'pg';
+import { ratelimit } from "@/lib/rateLimiter";
+import { headers } from "next/headers";
 
 // Constants
 const CACHE_TTL = 60 * 30; // 30 minutes cache TTL
@@ -111,6 +113,21 @@ function isValidDashboardResponse(data: unknown): data is DashboardResponse {
 
 export async function GET() {
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     // Authentication check
     const session = await getServerSession(authOptions);
     if (!session?.user?.id || session.user.role !== "Student") {

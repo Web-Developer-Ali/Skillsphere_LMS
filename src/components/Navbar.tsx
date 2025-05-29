@@ -182,15 +182,16 @@ export function Navbar() {
 
           <div className="flex items-center gap-2">
             {session && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative text-muted-foreground dark:text-gray-400 hover:text-primary dark:hover:text-blue-400"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="sr-only">Notifications</span>
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary dark:bg-blue-400"></span>
-              </Button>
+             <Button
+             variant="ghost"
+             size="icon"
+             className="relative text-muted-foreground dark:text-gray-400 hover:text-primary dark:hover:text-blue-400"
+             title="This feature is under development"
+           >
+             <Bell className="h-5 w-5" />
+             <span className="sr-only">Notifications</span>
+             <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary dark:bg-blue-400"></span>
+           </Button>
             )}
 
             <DropdownMenu>

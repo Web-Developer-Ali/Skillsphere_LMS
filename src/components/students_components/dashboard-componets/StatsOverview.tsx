@@ -20,7 +20,7 @@ export default function StatsOverview({ userInfo }: StatsOverviewProps) {
             Courses in Progress
           </CardTitle>
           <BookOpen className="h-4 w-4 text-primary dark:text-blue-400" />
-          </CardHeader>
+        </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold dark:text-white">
             {userInfo?.enrolledCourseCount || 0}
@@ -34,7 +34,6 @@ export default function StatsOverview({ userInfo }: StatsOverviewProps) {
             Minutes Learned
           </CardTitle>
           <Clock className="h-4 w-4 text-primary dark:text-blue-400" />
-          
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold dark:text-white">
@@ -43,13 +42,15 @@ export default function StatsOverview({ userInfo }: StatsOverviewProps) {
         </CardContent>
       </Card>
       {/* Certification */}
-      <Card className="h-full dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-shadow duration-300">
+      <Card
+        className="h-full dark:bg-gray-800 dark:border-gray-700 hover:shadow-md transition-shadow duration-300"
+        title="This feature is under development"
+      >
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-sm font-medium dark:text-gray-100">
-          Certificates
+            Certificates
           </CardTitle>
           <Trophy className="h-4 w-4 text-primary dark:text-blue-400" />
-         
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold dark:text-white">

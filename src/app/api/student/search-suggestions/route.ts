@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import connectToDatabase from "@/lib/dbConnect";
 import { redis } from "@/lib/redis";
 import { SearchResponseData } from "@/types/serch-suggestions";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 // Cache configuration
 const CACHE_TTL = 60 * 5; // 5 minutes
@@ -14,12 +16,12 @@ export async function GET(req: NextRequest) {
 
   // Early return for empty or too short queries
   if (!query || query.length < MIN_QUERY_LENGTH) {
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      data: { 
-        coursesTitles: [], 
-        categories: [] 
-      } 
+      data: {
+        coursesTitles: [],
+        categories: []
+      }
     });
   }
 
@@ -27,6 +29,22 @@ export async function GET(req: NextRequest) {
   const cacheKey = `course-search:${query.toLowerCase()}`;
 
   try {
+
+    // Rate limiting check
+    const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+    const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+    if (!success) {
+      return new NextResponse('Too many requests', {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit': limit.toString(),
+          'X-RateLimit-Remaining': remaining.toString(),
+          'X-RateLimit-Reset': reset.toString(),
+        },
+      });
+    }
+
     // Try to get cached results
     const cached = await redis.get(cacheKey);
     if (cached) {
@@ -97,7 +115,7 @@ export async function GET(req: NextRequest) {
     };
 
     // Cache the response in background
-    cacheResponse(cacheKey, response).catch(e => 
+    cacheResponse(cacheKey, response).catch(e =>
       console.error("Background cache update failed:", e)
     );
 

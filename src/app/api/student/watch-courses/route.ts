@@ -5,10 +5,28 @@ import connectToDatabase from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import { ChapterRow, CourseResponse, ErrorResponse } from "@/types/watch-courses-api";
+import { headers } from "next/headers";
+import { ratelimit } from "@/lib/rateLimiter";
 
 
 export async function GET(request: Request): Promise<NextResponse<CourseResponse | ErrorResponse>> {
     try {
+
+        // Rate limiting check
+        const ip = headers().get('x-forwarded-for') ?? '127.0.0.1';
+        const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+        if (!success) {
+            return new NextResponse('Too many requests', {
+                status: 429,
+                headers: {
+                    'X-RateLimit-Limit': limit.toString(),
+                    'X-RateLimit-Remaining': remaining.toString(),
+                    'X-RateLimit-Reset': reset.toString(),
+                },
+            });
+        }
+
         const session = await getServerSession(authOptions);
         if (!session?.user || session.user.role !== 'Student') {
             return NextResponse.json(
@@ -48,7 +66,7 @@ export async function GET(request: Request): Promise<NextResponse<CourseResponse
             `;
 
             const courseResult = await client.query(courseQuery, [courseId, session.user.id]);
-            
+
             if (courseResult.rows.length === 0) {
                 return NextResponse.json(
                     { error: "Not Found", message: "Course not found or not taught by an instructor" },
@@ -86,7 +104,7 @@ export async function GET(request: Request): Promise<NextResponse<CourseResponse
                 `;
 
                 const chaptersResult = await client.query(chaptersQuery, [courseId]);
-                
+
                 // Format chapters with all details including description
                 responseData.chapters = chaptersResult.rows.map((chapter: ChapterRow) => ({
                     chapterId: Number(chapter.chapterId),
@@ -110,9 +128,9 @@ export async function GET(request: Request): Promise<NextResponse<CourseResponse
     } catch (error) {
         console.error("Error fetching course details:", error);
         return NextResponse.json(
-            { 
-                error: "Internal Server Error", 
-                message: error instanceof Error ? error.message : 'Unknown error' 
+            {
+                error: "Internal Server Error",
+                message: error instanceof Error ? error.message : 'Unknown error'
             },
             { status: 500 }
         );

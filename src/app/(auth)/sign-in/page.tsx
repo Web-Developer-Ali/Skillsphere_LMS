@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,32 +12,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from '@/hooks/use-toast';
+import axios from 'axios';
 
 const signInSchema = z.object({
   identifier: z.string().email('Invalid email address'),
   password: z.string().min(1, 'Password is required'),
 });
 
+const ROUTES = {
+  STUDENT_DASHBOARD: '/student/dashboard',
+  INSTRUCTOR_DASHBOARD: '/instructor/dashboard'
+};
+
+type RoleResponse = {
+  status: "success" | "error";
+  role?: "Student" | "Instructor";
+  error?: string;
+};
+
 type SignInFormData = z.infer<typeof signInSchema>;
 
 function SignInForm() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data: session, status } = useSession();
-  
-  // Watch for session changes after sign-in
-  useEffect(() => {
-    if (status === "authenticated") {
-      if (session?.user?.role === 'Student') {
-        router.replace('/student/dashboard');
-      } else if (session?.user?.role === 'Instructor') {
-        router.replace('/instructor/dashboard');
-      } else {
-        router.replace('/');
-      }
-    }
-  }, [session, status, router]);
-
+  const [isLoading, setIsLoading] = React.useState(false);
   const {
     register,
     handleSubmit,
@@ -47,6 +45,9 @@ function SignInForm() {
   });
 
   const onSubmit: SubmitHandler<SignInFormData> = async (data) => {
+    if (isLoading) return;
+    setIsLoading(true);
+
     try {
       const result = await signIn('credentials', {
         redirect: false,
@@ -55,20 +56,37 @@ function SignInForm() {
       });
 
       if (!result?.ok) {
-        toast({
-          title: "Sign in failed",
-          description: result?.error || "An unexpected error occurred.",
-          variant: "destructive",
-        });
+        throw new Error(result?.error || "Authentication failed");
       }
-      // The useEffect will handle the redirect when session becomes available
+
+      const response = await axios.get<RoleResponse>("/api/registeration/get_user_role")
+        .catch(() => null);
+
+      if (!response?.data?.status) {
+        throw new Error("Failed to verify user role");
+      }
+
+      switch (response.data.role) {
+        case "Student":
+          router.replace(ROUTES.STUDENT_DASHBOARD);
+          break;
+        case "Instructor":
+          router.replace(ROUTES.INSTRUCTOR_DASHBOARD);
+          break;
+        default:
+          throw new Error("Unknown user role");
+      }
+
+      router.refresh();
     } catch (error) {
-      console.error("Error in signing in user:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       toast({
         title: "Sign in failed",
-        description: "An unexpected error occurred",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
